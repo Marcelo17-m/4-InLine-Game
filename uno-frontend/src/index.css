@@ -1,0 +1,43 @@
+:root {
+  /* Mesa de madera y fieltro, como una mesa de cartas real */
+  --table-wood: #1b120c;
+  --table-wood-edge: #120b07;
+  --table-felt: #123524;
+  --table-felt-dark: #0d2a1c;
+  --cream: #f4efe2;
+
+  /* Los 4 colores de UNO, usados con intención (no decorativos) */
+  --uno-red: #e4432d;
+  --uno-red-dark: #b5301f;
+  --uno-blue: #2c6fe0;
+  --uno-blue-dark: #1e4fa8;
+  --uno-green: #36a852;
+  --uno-green-dark: #287d3d;
+  --uno-yellow: #f4b60b;
+  --uno-yellow-dark: #c4900a;
+
+  --font-display: 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Work Sans', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--table-wood);
+  color: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}

@@ -1,0 +1,21 @@
+.table {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: radial-gradient(120% 90% at 50% -10%, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--table-wood);
+}
+
+/* El "fieltro": panel central que enmarca cada pantalla, como el centro de
+   una mesa de cartas rodeada por el borde de madera (.table) */
+.felt {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 3rem 2rem 2.5rem;
+  border-radius: 28px;
+  background: linear-gradient(180deg, var(--table-felt) 0%, var(--table-felt-dark) 100%);
+  box-shadow: 0 0 0 10px var(--table-wood-edge), 0 30px 60px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.06);
+}

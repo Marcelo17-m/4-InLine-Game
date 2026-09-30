@@ -1,0 +1,111 @@
+.back {
+  align-self: flex-start;
+  display: block;
+  background: none;
+  border: none;
+  color: rgba(244, 239, 226, 0.7);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--cream);
+}
+
+.title {
+  margin: 0 0 2rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.2rem;
+  color: var(--cream);
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: rgba(244, 239, 226, 0.8);
+}
+
+.field input {
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 2px solid rgba(244, 239, 226, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--cream);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.field input:focus-visible {
+  border-color: var(--uno-blue);
+}
+
+.error {
+  margin: 0;
+  color: var(--uno-yellow);
+  font-size: 0.85rem;
+}
+
+.submit {
+  margin-top: 0.5rem;
+  border: 3px solid var(--cream);
+  border-radius: 16px;
+  padding: 0.9rem 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--cream);
+  background: linear-gradient(180deg, var(--uno-blue), var(--uno-blue-dark));
+  cursor: pointer;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.submit:hover,
+.submit:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.25);
+}
+
+.submit:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.link {
+  display: block;
+  margin: 1.5rem auto 0;
+  background: none;
+  border: none;
+  color: rgba(244, 239, 226, 0.7);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link:hover,
+.link:focus-visible {
+  color: var(--cream);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}

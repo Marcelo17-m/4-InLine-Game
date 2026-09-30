@@ -1,0 +1,162 @@
+.titleWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 3rem;
+  letter-spacing: 0.05em;
+  color: var(--cream);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  animation: fade-in 0.5s ease-out both;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: stretch;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.cardButton {
+  --tilt: -2deg;
+  position: relative;
+  border: 3px solid var(--cream);
+  border-radius: 16px;
+  padding: 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  cursor: pointer;
+  transform: rotate(var(--tilt));
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  animation: deal-in 0.5s ease-out both;
+}
+
+.cardButton:nth-child(even) {
+  --tilt: 2deg;
+}
+
+.cardButton:hover,
+.cardButton:focus-visible {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.25);
+}
+
+.red {
+  background: linear-gradient(180deg, var(--uno-red), var(--uno-red-dark));
+}
+
+.blue {
+  background: linear-gradient(180deg, var(--uno-blue), var(--uno-blue-dark));
+}
+
+.yellow {
+  background: linear-gradient(180deg, var(--uno-yellow), var(--uno-yellow-dark));
+  color: #241a02;
+}
+
+.joinForm {
+  display: flex;
+  gap: 0.5rem;
+  animation: deal-in 0.3s ease-out both;
+  transform-origin: top center;
+}
+
+.joinInput {
+  flex: 1;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 3px solid var(--cream);
+  background: rgba(255, 255, 255, 0.95);
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  color: #333;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.joinInput:focus {
+  border-color: var(--uno-yellow);
+}
+
+.joinSubmit {
+  background: linear-gradient(180deg, var(--uno-yellow), var(--uno-yellow-dark));
+  color: #241a02;
+  border: 3px solid var(--cream);
+  border-radius: 12px;
+  padding: 0 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.joinSubmit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+
+.exitLink {
+  margin-top: 1rem;
+  background: none;
+  border: none;
+  color: rgba(244, 239, 226, 0.6);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+  animation: fade-in 0.5s ease-out both;
+  animation-delay: 0.2s;
+}
+
+.exitLink:hover,
+.exitLink:focus-visible {
+  color: var(--cream);
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.errorText {
+  color: var(--uno-red);
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.5rem;
+  font-family: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardButton, .title, .exitLink, .joinForm {
+    animation: none;
+  }
+}

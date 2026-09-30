@@ -1,0 +1,24 @@
+.card {
+  /* Proporción real de una carta en la hoja (~0.6485 : 1). (2009/12) x (1549/6) */
+  width: 116px;
+  height: 179px;
+  border-radius: 10px;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.playable {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.playable:hover {
+  transform: translateY(-6px);
+}
+
+.missing {
+  display: flex;
+  background: repeating-linear-gradient(45deg, #333, #333 6px, #222 6px, #222 12px);
+}

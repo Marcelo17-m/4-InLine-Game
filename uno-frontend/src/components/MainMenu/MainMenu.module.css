@@ -1,0 +1,172 @@
+.titleWrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 3rem;
+  height: 110px;
+}
+
+/* Cartas fantasma en abanico detrás del título, como una mano repartida */
+.fanCard {
+  position: absolute;
+  top: 6px;
+  width: 74px;
+  height: 100px;
+  border-radius: 10px;
+  background: var(--cream);
+  opacity: 0.16;
+}
+
+.fanCard[data-card='1'] {
+  transform: rotate(-16deg) translateX(-34px);
+}
+
+.fanCard[data-card='2'] {
+  opacity: 0.22;
+}
+
+.fanCard[data-card='3'] {
+  transform: rotate(16deg) translateX(34px);
+}
+
+.title {
+  position: relative;
+  margin: 0;
+  align-self: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 3.4rem;
+  letter-spacing: 0.08em;
+  color: var(--cream);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  animation: deal-title 0.6s ease-out both;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* Cada botón es literalmente una carta: borde grueso color crema,
+   levemente inclinada al reposo, se endereza y "levanta" al pasar el mouse,
+   como si la estuvieras tomando de la mesa. */
+.cardButton {
+  --tilt: -2deg;
+  position: relative;
+  border: 3px solid var(--cream);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  cursor: pointer;
+  transform: rotate(var(--tilt));
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  animation: deal-in 0.5s ease-out both;
+  animation-delay: calc(0.12s * var(--i) + 0.15s);
+}
+
+.cardButton:nth-child(even) {
+  --tilt: 1.5deg;
+}
+
+.cardButton:hover,
+.cardButton:focus-visible {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.25);
+}
+
+.cardButton:focus-visible {
+  outline: 3px solid var(--cream);
+  outline-offset: 3px;
+}
+
+.cardButton:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.red {
+  background: linear-gradient(180deg, var(--uno-red), var(--uno-red-dark));
+}
+
+.blue {
+  background: linear-gradient(180deg, var(--uno-blue), var(--uno-blue-dark));
+}
+
+.yellow {
+  background: linear-gradient(180deg, var(--uno-yellow), var(--uno-yellow-dark));
+  color: #241a02;
+}
+
+.exitLink {
+  margin-top: 0.5rem;
+  background: none;
+  border: none;
+  color: rgba(244, 239, 226, 0.6);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  cursor: pointer;
+  animation: fade-in 0.5s ease-out both;
+  animation-delay: calc(0.12s * var(--i) + 0.15s);
+}
+
+.exitLink:hover,
+.exitLink:focus-visible {
+  color: var(--cream);
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes deal-title {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardButton,
+  .title,
+  .exitLink {
+    animation: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .felt {
+    padding: 2.5rem 1.25rem 2rem;
+    border-radius: 20px;
+  }
+
+  .title {
+    font-size: 2.6rem;
+  }
+}

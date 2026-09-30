@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "Node16",
+    "target": "ES2022",
+    "types": ["jest", "node"]
+  },
+  "exclude": ["node_modules"]
+}

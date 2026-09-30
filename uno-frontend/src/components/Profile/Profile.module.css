@@ -1,0 +1,79 @@
+.dialog {
+  width: min(420px, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1.5rem;
+  border: 3px solid var(--cream);
+  border-radius: 24px;
+  background: linear-gradient(180deg, var(--table-felt), var(--table-felt-dark));
+  color: var(--cream);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+}
+
+.closeButton,
+.retryButton {
+  border: 2px solid var(--cream);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  background: var(--uno-yellow);
+  color: #241a02;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.closeButton:hover,
+.retryButton:hover {
+  background: var(--uno-yellow-dark);
+}
+
+.closeButton:focus-visible,
+.retryButton:focus-visible {
+  outline: 3px solid var(--uno-yellow);
+  outline-offset: 4px;
+}
+
+.details {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+}
+
+.details > div {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.details dt {
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--uno-yellow);
+}
+
+.details dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  overflow-wrap: anywhere;
+}

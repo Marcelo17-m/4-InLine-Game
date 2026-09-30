@@ -1,0 +1,16 @@
+import { Router } from 'express';
+import gameRoutes from './GameRoutes.js';
+import scoreRoutes from './ScoreRoutes.js';
+import cardRoutes from './CardRoutes.js';
+import authRoutes from './AuthRoutes.js';
+import statsRoutes from './StatsRoutes.js'
+
+const router = Router();
+
+router.use('/auth', authRoutes);
+router.use('/games', gameRoutes);
+router.use('/cards', cardRoutes);
+router.use('/scores', scoreRoutes);
+router.use('/stats', statsRoutes);
+
+export default router;
