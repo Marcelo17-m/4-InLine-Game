@@ -2,9 +2,9 @@ import Result from '../Monads/result.js';
 
 export const createAuthValidator = ({ userRepository, hashProvider }) => {
     const validateRegisterFieldsProvided = async (data) => {
-        const { username, email, password } = data;
-        if (!username || !email || !password) {
-            return Result.Err({ statusCode: 400, message: 'username, email and password are mandatory' });
+        const { username, password } = data;
+        if (!username || !password) {
+            return Result.Err({ statusCode: 400, message: 'username and password are mandatory' });
         }
         return Result.Ok(data);
     };
@@ -13,14 +13,6 @@ export const createAuthValidator = ({ userRepository, hashProvider }) => {
         const existingUsername = await userRepository.findByUsername(data.username);
         if (existingUsername) {
             return Result.Err({ statusCode: 409, message: 'User already exist' });
-        }
-        return Result.Ok(data);
-    };
- 
-    const validateEmailNotTaken = async (data) => {
-        const existingEmail = await userRepository.findByEmail(data.email);
-        if (existingEmail) {
-            return Result.Err({ statusCode: 409, message: 'User alredy exist' });
         }
         return Result.Ok(data);
     };
@@ -41,7 +33,7 @@ export const createAuthValidator = ({ userRepository, hashProvider }) => {
     };
  
     const validatePasswordMatches = async (data) => {
-        const passwordMatches = await hashProvider.compare(data.password, data.user.password);
+        const passwordMatches = await hashProvider.compare(data.password, data.user.passwordHash);
         if (!passwordMatches) {
             return Result.Err({ statusCode: 401, message: 'Invalid Credentials' });
         }
@@ -80,7 +72,6 @@ export const createAuthValidator = ({ userRepository, hashProvider }) => {
     return {
         validateRegisterFieldsProvided,
         validateUsernameNotTaken,
-        validateEmailNotTaken,
         validateLoginFieldsProvided,
         validateUserExistsForLogin,
         validatePasswordMatches,

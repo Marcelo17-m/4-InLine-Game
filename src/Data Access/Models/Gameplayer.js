@@ -15,25 +15,27 @@ const gamePlayerModel = (sequelize, DataTypes) => {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
-            joinedAt: {
-                type:DataTypes.DATE,
+            piece: {
+                type: DataTypes.ENUM('R', 'Y'),
                 allowNull: false,
-                defaultValue: DataTypes.NOW,
             },
-            // Identifies the player's piece in the board matrix.
-            playerNumber: {
+            turnOrder: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                validate: { isInt: true, isIn: [[1, 2]] },
+                validate: { isInt: true, isIn: [[0, 1]] },
             },
-            leftAt: { type: DataTypes.DATE, allowNull: true },
+            invitationStatus: {
+                type: DataTypes.ENUM('accepted', 'invited', 'rejected', 'abandoned'),
+                allowNull: false,
+                defaultValue: 'invited',
+            },
         },
         {
             tableName: 'game_players',
             timestamps: false,
             indexes: [
-                { unique: true, fields: ['gameId', 'userId']},
-                { unique: true, fields: ['gameId', 'playerNumber'], name: 'game_players_game_number' },
+                { unique: true, fields: ['gameId', 'userId'] },
+                { unique: true, fields: ['gameId', 'turnOrder'], name: 'game_players_game_turn_order' },
             ],
         }
     );

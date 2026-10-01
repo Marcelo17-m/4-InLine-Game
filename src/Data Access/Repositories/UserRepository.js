@@ -14,11 +14,7 @@ class UserRepository {
     }
 
     async findByUsername(username){
-        return User.scope('withPassword').findOne({ where: {username}});
-    }
-
-    async findByEmail(email){
-        return User.findOne({ ...options,where: {email}});
+        return User.scope('withPasswordHash').findOne({ where: { username } });
     }
 
     async update(id, data) {

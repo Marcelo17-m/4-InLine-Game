@@ -9,23 +9,15 @@ const gameModel = (sequelize, DataTypes) => {
                 primaryKey: true,
                 autoIncrement: true,
             },
-            name: {
-                type: DataTypes.STRING,
-                allowNull: false,
-            },
-            rules: {
-                type: DataTypes.STRING,
-                allowNull: true,
-            },
             creatorId: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
             state: {
-                type: DataTypes.ENUM('waiting', 'in_progress', 'finished'),
+                type: DataTypes.ENUM('pending', 'in_progress', 'finished', 'rejected'),
                 allowNull: false,
-                defaultValue: 'waiting',
-                validate: { isIn: [['waiting', 'in_progress', 'finished']] },
+                defaultValue: 'pending',
+                validate: { isIn: [['pending', 'in_progress', 'finished', 'rejected']] },
             },
             currentPlayerId:{
                 type: DataTypes.INTEGER,
@@ -42,16 +34,15 @@ const gameModel = (sequelize, DataTypes) => {
                 allowNull: true,
             },
             finishReason: {
-                type: DataTypes.ENUM('connect_four', 'draw', 'forfeit'),
+                type: DataTypes.ENUM('four_in_line', 'draw', 'abandoned', 'rejected'),
                 allowNull: true,
-                validate: { isIn: [['connect_four', 'draw', 'forfeit']] },
+                validate: { isIn: [['four_in_line', 'draw', 'abandoned', 'rejected']] },
             },
-            startedAt: { type: DataTypes.DATE, allowNull: true },
             finishedAt: { type: DataTypes.DATE, allowNull: true },
         },
         {
             tableName: 'games',
-            timestamps: true, //it could change to automatize the CreatedAt and UpdatedAt
+            timestamps: true,
             createdAt: 'createdAt',
             updatedAt: false,
             indexes: [{ fields: ['state'] }],
@@ -62,8 +53,16 @@ const gameModel = (sequelize, DataTypes) => {
                         if (!this.finishReason || !this.finishedAt || this.currentPlayerId != null) {
                             throw new Error('A finished Connect Four game requires a reason, end time and no current player');
                         }
+                        if (!['four_in_line', 'draw', 'abandoned'].includes(this.finishReason)) {
+                            throw new Error('A finished Connect Four game requires a game result');
+                        }
                         if ((this.finishReason === 'draw') !== (this.winnerId == null)) {
-                            throw new Error('A draw has no winner; a win or forfeit requires a winner');
+                            throw new Error('A draw has no winner; a win or abandoned game requires a winner');
+                        }
+                    } else if (this.state === 'rejected') {
+                        if (this.finishReason !== 'rejected' || !this.finishedAt ||
+                            this.currentPlayerId != null || this.winnerId != null) {
+                            throw new Error('A rejected game requires a rejected reason, end time and no winner');
                         }
                     } else if (this.winnerId != null || this.finishReason != null || this.finishedAt != null) {
                         throw new Error('An unfinished Connect Four game cannot have a result');
@@ -78,7 +77,6 @@ const gameModel = (sequelize, DataTypes) => {
         Game.belongsTo(models.User, { foreignKey: 'currentPlayerId', as: 'currentPlayer' });
         Game.belongsTo(models.User, { foreignKey: 'winnerId', as: 'winner', onDelete: 'RESTRICT' });
         Game.hasMany(models.Invitation, { foreignKey: 'gameId', as: 'invitations' });
-        Game.hasMany(models.Score, { foreignKey: 'gameId' });
         Game.hasMany(models.GamePlayer, { foreignKey: 'gameId' });
         Game.belongsToMany(models.User, {
             through: models.GamePlayer,

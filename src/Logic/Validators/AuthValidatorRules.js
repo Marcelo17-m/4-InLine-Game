@@ -3,8 +3,7 @@ import { composeAsyncValidators } from '../../Helpers/composeAsyncValidators.js'
 export const createAuthRules = (authValidator) => ({
     validateRegisterUser: composeAsyncValidators(
         authValidator.validateRegisterFieldsProvided,
-        authValidator.validateUsernameNotTaken,
-        authValidator.validateEmailNotTaken
+        authValidator.validateUsernameNotTaken
     ),
     validateLoginUser: composeAsyncValidators(
         authValidator.validateLoginFieldsProvided,
