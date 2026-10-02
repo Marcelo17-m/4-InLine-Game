@@ -12,31 +12,22 @@ const userModel = (sequelize, DataTypes) => {
                 allowNull: false,
                 unique: true,
             },
-            email: {
-                type: DataTypes.STRING,
-                allowNull: false,
-                unique: true,
-                validate: {
-                    isEmail: true,
-                },
-            },
-            password: {
+            passwordHash: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
         },
         {
             tableName: 'users',
-            timestamps: true, //it could change to automatize the CreatedAt and UpdatedAt
+            timestamps: true,
             createdAt: 'createdAt',
             updatedAt: false,
-            defaultScope: { attributes: { exclude: ['password'] } },
-            scopes: { withPassword: { attributes: { include: ['password'] } } },
+            defaultScope: { attributes: { exclude: ['passwordHash'] } },
+            scopes: { withPasswordHash: { attributes: { include: ['passwordHash'] } } },
         }
     );
 
     User.associate = (models) => {
-        User.hasMany(models.Score, { foreignKey: 'playerId', as: 'scores' });
         User.hasMany(models.Game, { foreignKey: 'creatorId', as: 'createdGames' });
         User.hasMany(models.GamePlayer, { foreignKey: 'userId' });
         User.belongsToMany(models.Game, {
@@ -51,10 +42,10 @@ const userModel = (sequelize, DataTypes) => {
         User.hasMany(models.Invitation, { foreignKey: 'recipientId', as: 'receivedInvitations', onDelete: 'CASCADE' });
     };
 
-    // Keep the hash available to AuthValidator, but never serialize it in responses.
+    // Keep the hash available to authentication, but never serialize it in responses.
     User.prototype.toJSON = function () {
         const values = { ...this.get({ plain: true }) };
-        delete values.password;
+        delete values.passwordHash;
         return values;
     };
     

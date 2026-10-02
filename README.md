@@ -1,4 +1,12 @@
-# UNO Game - Full-Stack Capstone
+# 4 In Line Game - Migration In Progress
+
+This branch starts the migration from UNO to a two-player online 4 In Line game. It removes the card and score domains, adapts the core models, and keeps the existing networking infrastructure for the next implementation step.
+
+See [CONNECT_FOUR_MIGRATION.md](CONNECT_FOUR_MIGRATION.md) for the completed scope, database decision, known limitations, and the exact plan to replace `GameService`.
+
+The remaining content below documents the legacy UNO implementation and is retained only as migration reference until the 4 In Line backend is complete.
+
+# Legacy UNO Game - Full-Stack Capstone
 
 **Author:** Marcelo Medrano Fonseca
 

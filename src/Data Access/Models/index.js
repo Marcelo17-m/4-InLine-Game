@@ -1,7 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../database.js';
 import gameModel from './Game.js';
-import scoreModel from './Score.js';
 import userModel from './User.js';
 import gamePlayerModel from './Gameplayer.js';
 import historyModel from './History.js';
@@ -12,7 +11,6 @@ export const createModels = (sequelize) => {
     const models = {};
 
     models.Game = gameModel(sequelize, DataTypes);
-    models.Score = scoreModel(sequelize, DataTypes);
     models.User = userModel(sequelize, DataTypes);
     models.GamePlayer = gamePlayerModel(sequelize, DataTypes);
     models.History = historyModel(sequelize, DataTypes);
@@ -32,6 +30,6 @@ export const createModels = (sequelize) => {
 
 const models = createModels(sequelize);
 
-export const {Game, Score, User, GamePlayer, History, ApiStats, Invitation} = models;
+export const { Game, User, GamePlayer, History, ApiStats, Invitation } = models;
 
 export default models;

@@ -1,12 +1,12 @@
 export const createAuthService = ({ userRepository, authRules,
      hashProvider, tokenProvider, blacklist, config }) => {
 
-    const registerUser = async ({username, email, password}) => {
-        const result = await authRules.validateRegisterUser({username, email, password});
+    const registerUser = async ({ username, password }) => {
+        const result = await authRules.validateRegisterUser({ username, password });
         if (result.isErr()) return result;
 
         const hashedPassword = await hashProvider.hash(password, config.saltRounds);
-        await userRepository.create({username, email, password: hashedPassword});
+        await userRepository.create({ username, passwordHash: hashedPassword });
 
         return result.map(() => ({message: 'User created successfully'}));
     };
@@ -38,7 +38,7 @@ export const createAuthService = ({ userRepository, authRules,
         const result = await authRules.validateGetProfile({id: userId});
         if (result.isErr()) return result;
 
-        return result.map(({ user }) => ({ id: user.id, username: user.username, email: user.email }));
+        return result.map(({ user }) => ({ id: user.id, username: user.username }));
     };
 
     const deleteUser = async ({id, requesterId, token}) => {

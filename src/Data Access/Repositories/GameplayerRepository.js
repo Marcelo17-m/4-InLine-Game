@@ -1,4 +1,5 @@
 import { GamePlayer, User } from '../Models/index.js';
+import { Op } from 'sequelize';
 
 class GamePlayerRepository {
     async create(data) {
@@ -7,14 +8,18 @@ class GamePlayerRepository {
 
     async findByGameId(gameId) {
         return GamePlayer.findAll({
-            where: { gameId }, order: [['playerNumber', 'ASC'], ['id', 'ASC']],
+            where: { gameId }, order: [['turnOrder', 'ASC'], ['id', 'ASC']],
             include: [{ model: User, attributes: ['id', 'username'] }],
         });
     }
 
     async findActiveByGameId(gameId) {
         return GamePlayer.findAll({
-            where: { gameId, leftAt: null }, order: [['playerNumber', 'ASC'], ['id', 'ASC']],
+            where: {
+                gameId,
+                invitationStatus: { [Op.in]: ['accepted', 'invited'] },
+            },
+            order: [['turnOrder', 'ASC'], ['id', 'ASC']],
             include: [{ model: User, attributes: ['id', 'username'] }],
         });
     }
@@ -29,9 +34,9 @@ class GamePlayerRepository {
         return player.update(data);
     }
 
-    async markLeft(gameId, userId) {
-        const [updated] = await GamePlayer.update({ leftAt: new Date() }, {
-            where: { gameId, userId, leftAt: null },
+    async updateInvitationStatus(gameId, userId, invitationStatus) {
+        const [updated] = await GamePlayer.update({ invitationStatus }, {
+            where: { gameId, userId },
         });
         return updated === 1;
     }
