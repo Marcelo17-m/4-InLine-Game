@@ -1,4 +1,4 @@
-// Persistence representation: row 0 is the top; 0 = empty, 1/2 = playerNumber.
+// Persistence representation: row 0 is the top; 0 = empty, 1 = R, 2 = Y.
 export const BOARD_ROWS = 6;
 export const BOARD_COLUMNS = 7;
 export const createEmptyBoard = () => Array.from(
