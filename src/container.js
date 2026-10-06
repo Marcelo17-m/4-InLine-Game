@@ -12,11 +12,7 @@ import { createAuthService } from './Logic/Services/AuthService.js';
 import { createGameValidator} from './Logic/Validators/GameValidator.js';
 import { createGameService} from './Logic/Services/GameService.js';
 import { createGameRules} from './Logic/Validators/GameValidatorRules.js';
-import { generateAndShuffleDeck } from './Helpers/deckHelper.js';
-import { distributeCardsRecursively } from './Helpers/distributionHelper.js';
-import { findCardInHand } from './Helpers/cardFinder.js';
-import { isValidMove } from './Helpers/cardRules.js';
-import { calculateHandScore } from './Helpers/scoreHelper.js';
+import * as connectFourRules from './Helpers/connectFourRules.js';
 import { createStatsService } from './Logic/Services/StatsService.js';
 import _ from 'lodash';
 
@@ -48,21 +44,16 @@ export const authService = createAuthService({
 });
 
 const gameValidator = createGameValidator({
-    gameRepository, userRepository, gamePlayerRepository,
-    cardRepository: null, helpers: {findCardInHand, isValidMove},
-    config: { validColors: ['red', 'yellow', 'green', 'blue']}
+    gameRepository, gamePlayerRepository, helpers: connectFourRules,
 });
 const gameRules = createGameRules(gameValidator);
 
 export const gameService = createGameService({
     gameRepository,
-    userRepository,
     gamePlayerRepository,
-    cardRepository: null,
-    scoreRepository: null,
     historyRepository,
     gameRules,
-    helpers: { generateAndShuffleDeck, distributeCardsRecursively, calculateHandScore, isValidMove }
+    helpers: connectFourRules,
 });
 
 export const statsApiService = createStatsService({
