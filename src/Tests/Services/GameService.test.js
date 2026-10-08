@@ -83,6 +83,12 @@ test('each created game receives an independent empty board', async () => {
     expect(second.gameId).not.toBe(first.gameId);
 });
 
+test('exposes Connect Four operations and invitation lifecycle', () => {
+    expect(Object.keys(service).sort()).toEqual([
+        'createInvitation', 'leaveGame', 'makeMove', 'respondInvitation',
+    ]);
+});
+
 test('rejects moves and abandonment while a game is pending', async () => {
     const initial = await start();
     await gameRepository.update(initial.gameId, { state: 'pending', currentPlayerId: null });

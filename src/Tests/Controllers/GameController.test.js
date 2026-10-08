@@ -8,7 +8,9 @@ import { revoke } from '../../Middleware/tokenBlacklist.js';
 import { createEmptyBoard } from '../../Helpers/connectFourRules.js';
 
 jest.mock('../../container.js', () => ({
-    gameService: { createGame: jest.fn(), makeMove: jest.fn(), leaveGame: jest.fn() },
+    gameService: {
+        createGame: jest.fn(), createInvitation: jest.fn(), respondInvitation: jest.fn(), makeMove: jest.fn(), leaveGame: jest.fn(),
+    },
 }));
 
 const app = express();
@@ -97,7 +99,33 @@ test('POST /leave returns the final game state', async () => {
     expect(response.body).toEqual(ended);
 });
 
-test.each(['/5/moves', '/5/leave', '/invitations', '/play-card', '/draw-card'])(
+test('POST /invitations creates an invitation using the authenticated creator', async () => {
+    const invitation = { gameId: 31, opponentId: 2, creator: { id: 1, username: 'alice' } };
+    gameService.createInvitation.mockResolvedValue(Result.Ok(invitation));
+
+    const response = await request(app).post('/api/games/invitations').send({
+        opponent_id: 2, creator_id: 99, access_token: tokenFor(),
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(invitation);
+    expect(gameService.createInvitation).toHaveBeenCalledWith({ creatorId: 1, opponentId: 2 });
+});
+
+test('POST /invitations/respond uses authenticated recipient and requested decision', async () => {
+    const stateAfterAccept = { ...state, gameId: 31, state: 'in_progress' };
+    gameService.respondInvitation.mockResolvedValue(Result.Ok(stateAfterAccept));
+
+    const response = await request(app).post('/api/games/invitations/respond').send({
+        game_id: 31, accept: true, user_id: 99, access_token: tokenFor(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(stateAfterAccept);
+    expect(gameService.respondInvitation).toHaveBeenCalledWith({ gameId: 31, userId: 1, accept: true });
+});
+
+test.each(['/5/moves', '/5/leave', '/play-card', '/draw-card'])(
     'removed route %s does not call the service', async (path) => {
         const response = await request(app).post('/api/games' + path).send({
             game_id: 5, access_token: tokenFor(),

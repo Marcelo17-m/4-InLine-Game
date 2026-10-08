@@ -16,6 +16,11 @@ export const removeConnection = (socketId) => {
     connections.delete(socketId);
 };
 
+export const isUserOnline = (userId) =>
+    [...connections.values()].some((connection) => String(connection.userId) === String(userId));
+
+export const userRoom = (userId) => `user:${userId}`;
+
 //Generator that runs all the sockets connected to a specific game
 //it relays on the internal rooms of socket.io and it sends the userId
 //that we save to be able to send each one a different view of the same game

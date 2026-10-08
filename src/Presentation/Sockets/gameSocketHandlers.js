@@ -2,7 +2,7 @@
 import { gameService } from "../../container.js";
 import logger from '../../Helpers/logger.js';
 import { safeSocketHandler } from "./safeSocketHandler.js";
-import {registerConnection, setConnectionGame, removeConnection, getSocketsInGame,} 
+import {registerConnection, setConnectionGame, removeConnection, getSocketsInGame, isUserOnline, userRoom,}
 from './connectionRegistry.js';
 
 //after every action that changes the state, each connected player receives his own view of the game
@@ -33,6 +33,32 @@ const emitResult = (socket, eventName, result) =>{
 export const registerGameSocketHandlers = (io) =>{
     io.on('connection', (socket) => {
         registerConnection(socket.id, socket.user.id);
+        socket.join(userRoom(socket.user.id));
+
+        socket.on('game:invite', safeSocketHandler(socket, 'game:invite', async ({ opponentId }) => {
+            if (!opponentId || !isUserOnline(opponentId)) {
+                socket.emit('error', { event: 'game:invite', message: 'Opponent is offline or unavailable' });
+                return;
+            }
+            const result = await gameService.createInvitation({ creatorId: socket.user.id, opponentId });
+            if (!emitResult(socket, 'game:invite', result)) return;
+            io.to(userRoom(opponentId)).emit('game:invitation', result.value);
+        }));
+
+        socket.on('game:invitation:respond', safeSocketHandler(socket, 'game:invitation:respond', async ({ gameId, accept }) => {
+            const result = await gameService.respondInvitation({ gameId, userId: socket.user.id, accept });
+            if (!emitResult(socket, 'game:invitation:respond', result)) return;
+            const state = result.value;
+            if (state.state === 'in_progress') {
+                const room = `game-${gameId}`;
+                io.in(userRoom(state.creatorId)).socketsJoin(room);
+                io.in(userRoom(socket.user.id)).socketsJoin(room);
+                setConnectionGame(socket.id, gameId);
+                io.to(room).emit('game:state', state);
+            } else {
+                io.to(userRoom(state.creatorId)).emit('game:invitation:rejected', { gameId: state.gameId });
+            }
+        }));
 
         socket.on('join', safeSocketHandler(socket, 'join', async({game_id})=>{
             const result = await gameService.joinGame({gameId:game_id,userId:socket.user.id});

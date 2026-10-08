@@ -29,5 +29,13 @@ export const createGameRules = (gameValidator) => {
         gameValidator.validateTwoPlayers,
     );
 
-    return { validateCreateGame, validateMakeMove, validateLeaveGame };
+    const validateCreateInvitation = composeAsyncValidators(
+        gameValidator.validateCreateInvitationInput,
+    );
+
+    const validateRespondInvitation = composeAsyncValidators(
+        gameValidator.validateRespondInvitationInput,
+    );
+
+    return { validateCreateGame,validateMakeMove, validateLeaveGame, validateCreateInvitation, validateRespondInvitation };
 };

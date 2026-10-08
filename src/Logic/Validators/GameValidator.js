@@ -89,9 +89,47 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
         return Result.Ok({ ...data, row });
     };
 
+    const validateCreateInvitationInput = async (data) => {
+        const creatorId = Number(data.creatorId);
+        const opponentId = Number(data.opponentId);
+        if (!Number.isSafeInteger(creatorId) || creatorId <= 0 || !Number.isSafeInteger(opponentId) || opponentId <= 0) {
+            return Result.Err({ statusCode: 400, message: 'creatorId and opponentId must be positive integers' });
+        }
+        if (creatorId === opponentId) {
+            return Result.Err({ statusCode: 400, message: 'You cannot invite yourself' });
+        }
+        const [creator, opponent] = await Promise.all([
+            userRepository.findById(creatorId),
+            userRepository.findById(opponentId),
+        ]);
+        if (!creator) return Result.Err({ statusCode: 404, message: 'Creator not found' });
+        if (!opponent) return Result.Err({ statusCode: 404, message: 'Opponent not found' });
+        const [creatorGames, opponentGames] = await Promise.all([
+            gamePlayerRepository.findActiveGamesByUserId(creatorId),
+            gamePlayerRepository.findActiveGamesByUserId(opponentId),
+        ]);
+        if (creatorGames.length || opponentGames.length) {
+            return Result.Err({ statusCode: 409, message: 'Both players must be available to start a game' });
+        }
+        return Result.Ok({ ...data, creatorId, opponentId, creator, opponent });
+    };
+
+    const validateRespondInvitationInput = async (data) => {
+        const gameId = Number(data.gameId);
+        const userId = Number(data.userId);
+        if (!Number.isSafeInteger(gameId) || gameId <= 0 || !Number.isSafeInteger(userId) || userId <= 0) {
+            return Result.Err({ statusCode: 400, message: 'gameId and authenticated userId must be positive integers' });
+        }
+        if (typeof data.accept !== 'boolean') {
+            return Result.Err({ statusCode: 400, message: 'accept must be a boolean' });
+        }
+        return Result.Ok({ ...data, gameId, userId });
+    };
+
     return {
         validateAuthenticatedUser, validateCreatorExists, validateGameIdProvided, validateColumn,
         validateGameExistsByGameId, validateUserIsInGame, validateAcceptedPlayer,
         validateGameInProgress, validateTwoPlayers, validateIsPlayerTurn, validateColumnHasSpace,
+        validateCreateInvitationInput, validateRespondInvitationInput,
     };
 };
