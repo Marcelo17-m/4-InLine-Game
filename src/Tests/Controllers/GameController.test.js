@@ -8,7 +8,7 @@ import { revoke } from '../../Middleware/tokenBlacklist.js';
 import { createEmptyBoard } from '../../Helpers/connectFourRules.js';
 
 jest.mock('../../container.js', () => ({
-    gameService: { makeMove: jest.fn(), leaveGame: jest.fn() },
+    gameService: { createGame: jest.fn(), makeMove: jest.fn(), leaveGame: jest.fn() },
 }));
 
 const app = express();
@@ -25,6 +25,7 @@ const state = {
 beforeEach(() => jest.clearAllMocks());
 
 describe.each([
+    ['/', 'createGame'],
     ['/make-move', 'makeMove'],
     ['/leave', 'leaveGame'],
 ])('%s body authentication', (path, method) => {
@@ -50,6 +51,25 @@ test.each([
     expect(response.status).toBe(200);
     expect(response.body).toEqual(state);
     expect(gameService[method]).toHaveBeenCalledWith(args);
+});
+
+test('POST / creates a game using only the identity from the body token', async () => {
+    const pending = { ...state, state: 'pending', currentPlayerId: null, creatorId: 1 };
+    gameService.createGame.mockResolvedValue(Result.Ok(pending));
+    const response = await request(app).post('/api/games').send({
+        access_token: tokenFor(), creatorId: 99, creator_id: 99, userId: 99,
+        state: 'in_progress', board: [[99]], winnerId: 99,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(pending);
+    expect(gameService.createGame).toHaveBeenCalledWith({ creatorId: 1 });
+});
+
+test('POST / returns creation validation errors using the existing error shape', async () => {
+    gameService.createGame.mockResolvedValue(Result.Err({ statusCode: 404, message: 'Creator not found' }));
+    const response = await request(app).post('/api/games').send({ access_token: tokenFor() });
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: 'Creator not found' });
 });
 
 test('returns the existing validation error shape and propagates persistence failures', async () => {

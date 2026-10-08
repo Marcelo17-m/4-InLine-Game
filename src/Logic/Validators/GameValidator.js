@@ -1,12 +1,20 @@
 import Result from '../Monads/result.js';
 
-export const createGameValidator = ({ gameRepository, gamePlayerRepository, helpers }) => {
+export const createGameValidator = ({ gameRepository, gamePlayerRepository, userRepository, helpers }) => {
     const validateAuthenticatedUser = async (data) => {
         const userId = Number(data.userId);
         if (!['number', 'string'].includes(typeof data.userId) || !Number.isSafeInteger(userId) || userId <= 0) {
             return Result.Err({ statusCode: 401, message: 'Authentication is required' });
         }
         return Result.Ok({ ...data, userId });
+    };
+
+    const validateCreatorExists = async (data) => {
+        const creator = await userRepository.findById(data.userId);
+        if (!creator) {
+            return Result.Err({ statusCode: 404, message: 'Creator not found' });
+        }
+        return Result.Ok({ ...data, creator });
     };
 
     const validateGameIdProvided = async (data) => {
@@ -82,7 +90,7 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, help
     };
 
     return {
-        validateAuthenticatedUser, validateGameIdProvided, validateColumn,
+        validateAuthenticatedUser, validateCreatorExists, validateGameIdProvided, validateColumn,
         validateGameExistsByGameId, validateUserIsInGame, validateAcceptedPlayer,
         validateGameInProgress, validateTwoPlayers, validateIsPlayerTurn, validateColumnHasSpace,
     };

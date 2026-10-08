@@ -1,6 +1,20 @@
 export const createGameService = ({
     gameRepository, gamePlayerRepository, historyRepository, gameRules, helpers,
 }) => {
+    const createGame = async ({ creatorId }) => {
+        const result = await gameRules.validateCreateGame({ userId: creatorId });
+        if (result.isErr()) return result;
+
+        const { userId } = result.value;
+        const game = await gameRepository.create({ creatorId: userId, state: 'pending' });
+        await gamePlayerRepository.create({
+            gameId: game.id, userId, piece: 'R', turnOrder: 0, invitationStatus: 'accepted',
+        });
+
+        const players = await gamePlayerRepository.findByGameId(game.id);
+        return result.map(() => helpers.toGameState(game, players));
+    };
+
     const makeMove = async (data) => {
         const result = await gameRules.validateMakeMove(data);
         if (result.isErr()) return result;
@@ -52,5 +66,5 @@ export const createGameService = ({
         return result.map(() => helpers.toGameState(updated, players));
     };
 
-    return { makeMove, leaveGame };
+    return { createGame, makeMove, leaveGame };
 };

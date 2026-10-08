@@ -1,6 +1,11 @@
 import { composeAsyncValidators } from '../../Helpers/composeAsyncValidators.js';
 
 export const createGameRules = (gameValidator) => {
+    const validateCreateGame = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateCreatorExists,
+    );
+
     const validateMakeMove = composeAsyncValidators(
         gameValidator.validateAuthenticatedUser,
         gameValidator.validateGameIdProvided,
@@ -24,5 +29,5 @@ export const createGameRules = (gameValidator) => {
         gameValidator.validateTwoPlayers,
     );
 
-    return { validateMakeMove, validateLeaveGame };
+    return { validateCreateGame, validateMakeMove, validateLeaveGame };
 };
