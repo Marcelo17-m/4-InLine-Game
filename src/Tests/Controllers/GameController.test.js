@@ -61,7 +61,7 @@ test('POST / creates a game using only the identity from the body token', async 
         state: 'in_progress', board: [[99]], winnerId: 99,
     });
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ message: 'Game created successfully' });
+    expect(response.body).toEqual({ message: 'Game created successfully', game_id: pending.gameId });
     expect(gameService.createGame).toHaveBeenCalledWith({ creatorId: 1 });
 });
 
