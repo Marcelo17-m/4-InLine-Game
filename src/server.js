@@ -18,7 +18,9 @@ process.on('unhandledRejection', (err) => {
     process.exit(1);
 });
 
+// Windows can reserve port ranges for system services; 3000 may be unavailable.
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
 
 //Express is still the same app as always we are just wrapping it up in a http.Server
 //to use the Socket.IO next to it
@@ -36,14 +38,12 @@ async function startServer() {
         await sequelize.authenticate();
         console.log('Connection to MySQL established');
 
-        //this successfully creates or updates the table based
-        // on the model.
         await sequelize.sync({ alter: true}); //force: true to reset everything to cero
         console.log('Sync models correctly');
 
-        httpServer.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
-            console.log(`Sockets listening on ws://localhost:${PORT}`);
+        httpServer.listen(PORT, HOST, () => {
+            console.log(`Server running on http://${HOST}:${PORT}`);
+            console.log(`Sockets listening on ws://${HOST}:${PORT}`);
         });
     } catch (err) {
         logger.error('Couldnt connect to the database:');    

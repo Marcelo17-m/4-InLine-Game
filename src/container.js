@@ -4,6 +4,8 @@ import gameRepository from './Data Access/Repositories/GameRepository.js';
 import userRepository from './Data Access/Repositories/UserRepository.js';
 import gamePlayerRepository from './Data Access/Repositories/GameplayerRepository.js';
 import historyRepository from './Data Access/Repositories/HistoryRepository.js';
+import invitationRepository from './Data Access/Repositories/InvitationRepository.js';
+import sequelize from './Data Access/database.js';
 import apiStatsRepository from './Data Access/Repositories/ApiStatsRepository.js';
 import { revoke } from './Middleware/tokenBlacklist.js';
 import { createAuthValidator } from './Logic/Validators/AuthValidator.js';
@@ -44,7 +46,7 @@ export const authService = createAuthService({
 });
 
 const gameValidator = createGameValidator({
-    gameRepository, gamePlayerRepository, helpers: connectFourRules,
+    gameRepository, gamePlayerRepository, userRepository, helpers: connectFourRules,
 });
 const gameRules = createGameRules(gameValidator);
 
@@ -52,6 +54,8 @@ export const gameService = createGameService({
     gameRepository,
     gamePlayerRepository,
     historyRepository,
+    invitationRepository,
+    sequelize,
     gameRules,
     helpers: connectFourRules,
 });

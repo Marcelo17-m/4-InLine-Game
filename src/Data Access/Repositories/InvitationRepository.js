@@ -1,16 +1,16 @@
 import { Invitation } from '../Models/index.js';
 
 class InvitationRepository {
-    async create(data) {
-        return Invitation.create(data);
+    async create(data, options = {}) {
+        return Invitation.create(data, options);
     }
 
-    async findById(id) {
-        return Invitation.findByPk(id);
+    async findById(id, transaction) {
+        return Invitation.findByPk(id, { transaction });
     }
 
-    async findByGameId(gameId) {
-        return Invitation.findAll({ where: { gameId }, order: [['id', 'ASC']] });
+    async findByGameId(gameId, transaction) {
+        return Invitation.findAll({ where: { gameId }, order: [['id', 'ASC']], transaction });
     }
 
     async findPendingByRecipientId(recipientId) {
@@ -20,12 +20,12 @@ class InvitationRepository {
     }
 
     // Authorization and joining a match belong to the service using this repository.
-    async respond(id, recipientId, status) {
+    async respond(id, recipientId, status, transaction) {
         if (!['accepted', 'rejected'].includes(status)) {
             throw new Error('An invitation response must be accepted or rejected');
         }
         const [updated] = await Invitation.update({ status, respondedAt: new Date() }, {
-            where: { id, recipientId, status: 'pending' },
+            where: { id, recipientId, status: 'pending' }, transaction,
         });
         return updated === 1;
     }

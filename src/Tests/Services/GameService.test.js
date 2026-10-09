@@ -3,13 +3,14 @@ import { Game, GamePlayer, History, User } from '../../Data Access/Models/index.
 import gameRepository from '../../Data Access/Repositories/GameRepository.js';
 import gamePlayerRepository from '../../Data Access/Repositories/GameplayerRepository.js';
 import historyRepository from '../../Data Access/Repositories/HistoryRepository.js';
+import userRepository from '../../Data Access/Repositories/UserRepository.js';
 import { createGameService } from '../../Logic/Services/GameService.js';
 import { createGameValidator } from '../../Logic/Validators/GameValidator.js';
 import { createGameRules } from '../../Logic/Validators/GameValidatorRules.js';
 import * as helpers from '../../Helpers/connectFourRules.js';
 
 const dependencies = { gameRepository, gamePlayerRepository, historyRepository };
-const gameRules = createGameRules(createGameValidator({ ...dependencies, helpers }));
+const gameRules = createGameRules(createGameValidator({ ...dependencies, userRepository, helpers }));
 const service = createGameService({ ...dependencies, gameRules, helpers });
 let red, yellow, outsider;
 
@@ -43,8 +44,49 @@ beforeEach(async () => {
 });
 afterAll(() => sequelize.close());
 
-test('exposes only makeMove and leaveGame', () => {
-    expect(Object.keys(service).sort()).toEqual(['leaveGame', 'makeMove']);
+test('exposes creation, moves and abandonment', () => {
+    expect(Object.keys(service).sort()).toEqual(['createGame', 'leaveGame', 'makeMove']);
+});
+
+test('creates a pending game with an empty board and the authenticated creator as red', async () => {
+    const created = value(await service.createGame({ creatorId: String(red.id) }));
+    expect(created).toMatchObject({
+        creatorId: red.id, state: 'pending', board: helpers.createEmptyBoard(),
+        currentPlayerId: null, winnerId: null, finishReason: null, finishedAt: null,
+    });
+    expect(created.players).toEqual([{
+        userId: red.id, username: 'red', piece: 'R', turnOrder: 0, invitationStatus: 'accepted',
+    }]);
+    expect(created.gameId).toBeGreaterThan(0);
+    const persisted = await Game.findByPk(created.gameId);
+    expect(persisted.board).toEqual(helpers.createEmptyBoard());
+    expect(persisted.state).toBe('pending');
+    expect(await GamePlayer.count({ where: { gameId: created.gameId, userId: red.id } })).toBe(1);
+    expect(await History.count()).toBe(0);
+    expect(JSON.stringify(created)).not.toContain('password');
+    expectError(await move(created.gameId, red.id, 0), 409, 'The game is not in progress');
+});
+
+test('rejects invalid or nonexistent creators before saving a game', async () => {
+    expectError(await service.createGame({ creatorId: null }), 401, 'Authentication is required');
+    expectError(await service.createGame({ creatorId: 999 }), 404, 'Creator not found');
+    expect(await Game.count()).toBe(0);
+    expect(await GamePlayer.count()).toBe(0);
+});
+
+test('each created game receives an independent empty board', async () => {
+    const first = value(await service.createGame({ creatorId: red.id }));
+    first.board[5][0] = 1;
+    await gameRepository.update(first.gameId, { board: first.board });
+    const second = value(await service.createGame({ creatorId: yellow.id }));
+    expect(second.board).toEqual(helpers.createEmptyBoard());
+    expect(second.gameId).not.toBe(first.gameId);
+});
+
+test('exposes Connect Four operations and invitation lifecycle', () => {
+    expect(Object.keys(service).sort()).toEqual([
+        'createInvitation', 'leaveGame', 'makeMove', 'respondInvitation',
+    ]);
 });
 
 test('rejects moves and abandonment while a game is pending', async () => {

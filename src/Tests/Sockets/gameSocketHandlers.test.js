@@ -19,6 +19,7 @@ describe('game socket handlers', () => {
             on: jest.fn((eventName, handler) => {
                 socketHandlers[eventName] = handler;
             }),
+            join: jest.fn(),
             emit: jest.fn(),
         };
         const io = {
