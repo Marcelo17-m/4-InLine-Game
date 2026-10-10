@@ -1,6 +1,40 @@
 import { composeAsyncValidators } from '../../Helpers/composeAsyncValidators.js';
 
 export const createGameRules = (gameValidator) => {
+    const validateGetAllGames = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+    );
+
+    const validateGetGameById = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateGameExistsByGameId,
+    );
+
+    const validateGetGameForPlayer = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateGameExistsByGameId,
+        gameValidator.validateUserIsInGame,
+    );
+
+    const validateDeleteGame = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateGameExistsByGameId,
+        gameValidator.validateGameCreator,
+    );
+
+    const validateUpdateGame = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateGameExistsByGameId,
+        gameValidator.validateGameCreator,
+        gameValidator.validateUpdateFields,
+        gameValidator.validateUpdatedBoard,
+        gameValidator.validateUpdatedGameState,
+    );
+
     const validateCreateGame = composeAsyncValidators(
         gameValidator.validateAuthenticatedUser,
         gameValidator.validateCreatorExists,
@@ -37,5 +71,8 @@ export const createGameRules = (gameValidator) => {
         gameValidator.validateRespondInvitationInput,
     );
 
-    return { validateCreateGame,validateMakeMove, validateLeaveGame, validateCreateInvitation, validateRespondInvitation };
+    return {
+        validateCreateGame, validateMakeMove, validateLeaveGame, validateCreateInvitation, validateRespondInvitation,
+        validateGetAllGames, validateGetGameById, validateGetGameForPlayer, validateDeleteGame, validateUpdateGame,
+    };
 };

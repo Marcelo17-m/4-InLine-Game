@@ -5,6 +5,56 @@ export const createGameService = ({
     sequelize, gameRules, helpers,
 }) => {
     
+    const getAllGames = async (data) => {
+        const result = await gameRules.validateGetAllGames(data);
+        if (result.isErr()) return result;
+
+        const games = await gameRepository.findAll();
+        const states = await Promise.all(games.map(async (game) => {
+            const players = await gamePlayerRepository.findByGameId(game.id);
+            return helpers.toGameState(game, players);
+        }));
+        return result.map(() => states);
+    };
+
+    const getGameById = async (data) => {
+        const result = await gameRules.validateGetGameById(data);
+        if (result.isErr()) return result;
+
+        const { game, gameId } = result.value;
+        const players = await gamePlayerRepository.findByGameId(gameId);
+        return result.map(() => helpers.toGameState(game, players));
+    };
+
+    const getGameForPlayer = async (data) => {
+        const result = await gameRules.validateGetGameForPlayer(data);
+        if (result.isErr()) return result;
+
+        return result.map(({ game, players }) => helpers.toGameState(game, players));
+    };
+
+    const deleteGame = async (data) => {
+        const result = await gameRules.validateDeleteGame(data);
+        if (result.isErr()) return result;
+
+        const { gameId } = result.value;
+        await gameRepository.delete(gameId);
+        return result.map(() => ({ message: 'Game deleted successfully', game_id: gameId }));
+    };
+
+    const updateGame = async (data) => {
+        const result = await gameRules.validateUpdateGame(data);
+        if (result.isErr()) return result;
+
+        const { game, gameId, updates, proposed } = result.value;
+        const finished = ['finished', 'rejected'].includes(proposed.state);
+        await gameRepository.update(gameId, {
+            ...updates,
+            finishedAt: finished ? (game.finishedAt ?? new Date()) : null,
+        });
+        return result.map(() => ({ message: 'Game updated successfully', game_id: gameId }));
+    };
+
     const createGame = async ({ creatorId }) => {
         const result = await gameRules.validateCreateGame({ userId: creatorId });
         if (result.isErr()) return result;
@@ -131,7 +181,17 @@ export const createGameService = ({
         }
 
         const players = await gamePlayerRepository.findByGameId(gameId);
-        return result.map(() => helpers.toGameState(updated, players));
+        return result.map(() => {
+            const state = helpers.toGameState(updated, players);
+            if (!won) return state;
+
+            const winner = state.players.find((player) => player.userId === userId);
+            return {
+                ...state,
+                message: `${winner.username} won the game!`,
+                winner: { userId: winner.userId, username: winner.username, piece: winner.piece },
+            };
+        });
     };
 
     const leaveGame = async (data) => {
@@ -152,5 +212,8 @@ export const createGameService = ({
         return result.map(() => helpers.toGameState(updated, players));
     };
 
-    return { createGame,createInvitation, respondInvitation, makeMove, leaveGame };
+    return {
+        createGame, createInvitation, respondInvitation, makeMove, leaveGame,
+        getAllGames, getGameById, getGameForPlayer, deleteGame, updateGame,
+    };
 };
