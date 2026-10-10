@@ -159,7 +159,10 @@ describe('GameService invitations', () => {
             expect(invitationRepository.respond).toHaveBeenCalledWith(80, 2, status, expect.any(Object));
             expect(gamePlayerRepository.updateInvitationStatus).toHaveBeenCalledWith(31, 2, status, expect.any(Object));
             expect(gameRepository.update).toHaveBeenCalledWith(31, changes, expect.any(Object));
-            expect(helpers.toGameState).toHaveBeenCalledTimes(1);
+            expect(result.value).toEqual({
+                message: accept ? 'Invitation accepted successfully' : 'Invitation rejected',
+                status: accept ? 'ACCEPTED' : 'REJECTED',
+            });
         });
 
         it('does not authorize another user to respond', async () => {
