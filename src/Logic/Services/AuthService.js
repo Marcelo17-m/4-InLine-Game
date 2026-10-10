@@ -1,12 +1,12 @@
 export const createAuthService = ({ userRepository, authRules,
      hashProvider, tokenProvider, blacklist, config }) => {
 
-    const registerUser = async ({ username, password }) => {
-        const result = await authRules.validateRegisterUser({ username, password });
+    const registerUser = async ({ username, password, email }) => {
+        const result = await authRules.validateRegisterUser({ username, password, email });
         if (result.isErr()) return result;
 
         const hashedPassword = await hashProvider.hash(password, config.saltRounds);
-        await userRepository.create({ username, passwordHash: hashedPassword });
+        await userRepository.create({ username, passwordHash: hashedPassword, email: result.value.email });
 
         return result.map(() => ({message: 'User created successfully'}));
     };
