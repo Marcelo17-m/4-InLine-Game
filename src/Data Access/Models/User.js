@@ -12,6 +12,11 @@ const userModel = (sequelize, DataTypes) => {
                 allowNull: false,
                 unique: true,
             },
+            email: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                unique: true,
+            },
             passwordHash: {
                 type: DataTypes.STRING,
                 allowNull: false,
