@@ -1,38 +1,13 @@
-//Concurrent map: what socket is from each user and what game is in.
-//It allows us to know who is connected where without consulting back the db
-//in each broadcast
-const connections = new Map(); //socketId -> {userid, gameId}
-
-export const registerConnection = (socketId, userId) => {
-    connections.set(socketId,{userId,gameId:null});
-};
-
-export const setConnectionGame = (socketId, gameId) => {
-    const entry = connections.get(socketId);
-    if (entry) entry.gameId = gameId;
-};
-
-export const removeConnection = (socketId) => {
-    connections.delete(socketId);
-};
-
-export const isUserOnline = (userId) =>
-    [...connections.values()].some((connection) => String(connection.userId) === String(userId));
-
+// Socket.IO owns membership and automatically removes disconnected sockets.
 export const userRoom = (userId) => `user:${userId}`;
+export const gameRoom = (gameId) => `game-${gameId}`;
 
-//Generator that runs all the sockets connected to a specific game
-//it relays on the internal rooms of socket.io and it sends the userId
-//that we save to be able to send each one a different view of the same game
-export function* getSocketsInGame(io, gameId) {
-    const room = io.sockets.adapter.rooms.get(`game-${gameId}`);
-    if(!room) return;
-
-    for (const socketId of room) {
-        const socket=io.sockets.sockets.get(socketId);
-        const connection=connections.get(socketId);
-        if (socket &&connection) {
-            yield {socket, userId:connection.userId};
-        }
+export const joinPlayersToGame = (io, gameId, userIds) => {
+    for (const userId of new Set(userIds)) {
+        io.in(userRoom(userId)).socketsJoin(gameRoom(gameId));
     }
-}
+};
+
+export const leaveGameRoom = (io, gameId) => {
+    io.in(gameRoom(gameId)).socketsLeave(gameRoom(gameId));
+};
