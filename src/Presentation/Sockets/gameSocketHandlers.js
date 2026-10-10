@@ -1,130 +1,94 @@
-//the sockets controller
-import { gameService } from "../../container.js";
-import logger from '../../Helpers/logger.js';
-import { safeSocketHandler } from "./safeSocketHandler.js";
-import {registerConnection, setConnectionGame, removeConnection, getSocketsInGame, isUserOnline, userRoom,}
-from './connectionRegistry.js';
+import { gameService, gameEvents } from '../../container.js';
+import { safeSocketHandler } from './safeSocketHandler.js';
+import { gameRoom, userRoom } from './connectionRegistry.js';
 
-//after every action that changes the state, each connected player receives his own view of the game
-//his own hand and the rivals just in quantity
-const broadcastGameState = async (io, gameId) => {
-    for (const {socket, userId} of getSocketsInGame(io,gameId)){
-        try {
-            const result = await gameService.getGameStateDetail({gameId, userId});
-            if (result.isOk()){
-                socket.emit('game-state', result.value);
-            }
-        } catch (err){
-            logger.error(`broadcastGameState failed for user ${userId} in game ${gameId}:`);
-            logger.error(err);
-        }
-    }
-};
-
-const emitResult = (socket, eventName, result) =>{
+const emitResult = (socket, event, result) => {
     if (result.isErr()) {
-        socket.emit('error',{event:eventName,message:result.error.message});
+        socket.emit('error', { event, message: result.error.message });
         return false;
     }
-    socket.emit(eventName,result.value);
+    socket.emit(event, result.value);
     return true;
 };
 
-export const registerGameSocketHandlers = (io) =>{
+export const registerGameSocketHandlers = (io) => {
+    gameEvents.attach(io);
     io.on('connection', (socket) => {
-        registerConnection(socket.id, socket.user.id);
         socket.join(userRoom(socket.user.id));
+        const on = (event, handler) => socket.on(event, safeSocketHandler(socket, event, handler));
+        // Match HTTP body keys; also accept the previous camelCase invitation payloads.
+        const gameIdFrom = (data) => data.game_id ?? data.gameId;
 
-        socket.on('game:invite', safeSocketHandler(socket, 'game:invite', async ({ opponentId }) => {
-            if (!opponentId || !isUserOnline(opponentId)) {
-                socket.emit('error', { event: 'game:invite', message: 'Opponent is offline or unavailable' });
-                return;
+        on('game:create', async () => {
+            const result = await gameService.createGame({ creatorId: socket.user.id });
+            if (result.isOk()) await gameEvents.publishState(result.value);
+            emitResult(socket, 'game:create', result.map((game) => ({
+                message: 'Game created successfully', game_id: game.gameId,
+            })));
+        });
+
+        on('game:list', async () => {
+            emitResult(socket, 'game:list', await gameService.getAllGames({ userId: socket.user.id }));
+        });
+
+        on('game:get', async (data) => {
+            emitResult(socket, 'game:get', await gameService.getGameById({
+                gameId: gameIdFrom(data), userId: socket.user.id,
+            }));
+        });
+
+        // Rejoin an existing game room; this never adds a participant or starts a match.
+        on('game:join', async (data) => {
+            const result = await gameService.getGameForPlayer({ gameId: gameIdFrom(data), userId: socket.user.id });
+            if (result.isErr()) return emitResult(socket, 'game:join', result);
+            if (['pending', 'in_progress'].includes(result.value.state)) {
+                await socket.join(gameRoom(result.value.gameId));
             }
-            const result = await gameService.createInvitation({ creatorId: socket.user.id, opponentId });
-            if (!emitResult(socket, 'game:invite', result)) return;
-            io.to(userRoom(opponentId)).emit('game:invitation', result.value);
-        }));
+            emitResult(socket, 'game:join', result);
+            socket.emit('game:state', result.value);
+        });
 
-        socket.on('game:invitation:respond', safeSocketHandler(socket, 'game:invitation:respond', async ({ gameId, accept }) => {
-            const result = await gameService.respondInvitation({ gameId, userId: socket.user.id, accept });
-            if (!emitResult(socket, 'game:invitation:respond', result)) return;
-            const state = result.value;
-            if (state.state === 'in_progress') {
-                const room = `game-${gameId}`;
-                io.in(userRoom(state.creatorId)).socketsJoin(room);
-                io.in(userRoom(socket.user.id)).socketsJoin(room);
-                setConnectionGame(socket.id, gameId);
-                io.to(room).emit('game:state', state);
-            } else {
-                io.to(userRoom(state.creatorId)).emit('game:invitation:rejected', { gameId: state.gameId });
-            }
-        }));
-
-        socket.on('join', safeSocketHandler(socket, 'join', async({game_id})=>{
-            const result = await gameService.joinGame({gameId:game_id,userId:socket.user.id});
-
-            const alreadyJoined = result.isErr() && result.error.message === 'You are alredy in this game';
-            if (result.isErr() && !alreadyJoined) {
-                return emitResult(socket, 'join', result);
-            }
-
-            socket.join(`game-${game_id}`);
-            setConnectionGame(socket.id, game_id);
-            const players = await gameService.getGamePlayers(game_id);
-            io.to(`game-${game_id}`).emit('join', {
-                message: `${socket.user.username} has joined the game.`,
-                players: players.isOk() ? players.value.players : [],
+        on('game:invite', async (data) => {
+            const result = await gameService.createInvitation({
+                creatorId: socket.user.id, opponentId: data.opponent_id ?? data.opponentId,
             });
-        }));
-        socket.on('start-game', safeSocketHandler(socket, 'start-game', async ({ game_id }) => {
-            const result = await gameService.startGame({gameId:game_id,userId:socket.user.id });
-            if (!emitResult(socket, 'start-game', result)) return;
-            await broadcastGameState(io, game_id);
-        }));
+            if (result.isOk()) await gameEvents.invitationCreated(result.value);
+            emitResult(socket, 'game:invite', result);
+        });
 
-        socket.on('play-card', safeSocketHandler(socket, 'play-card', async ({ game_id, card, chosen_color }) => {
-            const result = await gameService.playCard({
-                gameId: game_id, userId: socket.user.id, cardString:card, chosenColor:chosen_color,
+        on('game:invitation:respond', async (data) => {
+            const gameId = gameIdFrom(data);
+            const result = await gameService.respondInvitation({ gameId, userId: socket.user.id, accept: data.accept });
+            if (result.isOk()) await gameEvents.invitationResponded({ gameId, userId: socket.user.id, response: result.value });
+            emitResult(socket, 'game:invitation:respond', result);
+        });
+
+        on('game:move', async (data) => {
+            const result = await gameService.makeMove({
+                gameId: gameIdFrom(data), userId: socket.user.id, column: data.column,
             });
-            if (!emitResult(socket, 'play-card', result)) return;
+            if (result.isOk()) await gameEvents.publishState(result.value);
+            emitResult(socket, 'game:move', result);
+        });
 
-            if (result.value.scores) {
-                io.to(`game-${game_id}`).emit('game-ended', result.value);
-            }
+        on('game:leave', async (data) => {
+            const result = await gameService.leaveGame({ gameId: gameIdFrom(data), userId: socket.user.id });
+            if (result.isOk()) await gameEvents.publishState(result.value);
+            emitResult(socket, 'game:leave', result);
+        });
 
-            await broadcastGameState(io, game_id);
-        }));
+        on('game:update', async (data) => {
+            const gameId = gameIdFrom(data);
+            const result = await gameService.updateGame({ gameId, userId: socket.user.id, updates: data.updates });
+            if (result.isOk()) await gameEvents.refreshState({ gameId, userId: socket.user.id });
+            emitResult(socket, 'game:update', result);
+        });
 
-        socket.on('draw-card', safeSocketHandler(socket, 'draw-card', async ({ game_id }) => {
-            const result = await gameService.drawCard({gameId:game_id, userId:socket.user.id});
-            if (!emitResult(socket, 'draw-card', result)) return;
-            await broadcastGameState(io, game_id);
-        }));
-
-        socket.on('say-uno', safeSocketHandler(socket, 'say-uno', async ({ game_id }) => {
-            const result = await gameService.sayUno({gameId:game_id, userId:socket.user.id});
-            if (!emitResult(socket, 'say-uno', result)) return;
-            await broadcastGameState(io, game_id);
-        }));
-
-        socket.on('catch-uno', safeSocketHandler(socket, 'catch-uno', async ({ game_id, target_user_id }) => {
-            const result = await gameService.catchUno({
-                gameId:game_id, userId:socket.user.id, targetUserId:target_user_id,
-            });
-            if (!emitResult(socket, 'catch-uno', result)) return;
-            await broadcastGameState(io, game_id);
-        }));
-
-        socket.on('leave-game', safeSocketHandler(socket, 'leave-game', async ({ game_id }) => {
-            const result = await gameService.leaveGame({gameId:game_id, userId:socket.user.id});
-            if (!emitResult(socket, 'leave-game', result)) return;
-            socket.leave(`game-${game_id}`);
-            await broadcastGameState(io, game_id);
-        }));
-
-        socket.on('disconnect', safeSocketHandler(socket, 'disconnect', async () => {
-            removeConnection(socket.id);
-            //future rule to add that we do not force the lave game
-        }));
-    })
-}
+        on('game:delete', async (data) => {
+            const result = await gameService.deleteGame({ gameId: gameIdFrom(data), userId: socket.user.id });
+            if (result.isOk()) await gameEvents.gameDeleted(result.value);
+            emitResult(socket, 'game:delete', result);
+        });
+        // Disconnect only removes Socket.IO memberships; abandonment requires game:leave.
+    });
+};

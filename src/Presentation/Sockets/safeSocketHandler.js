@@ -1,4 +1,5 @@
 import logger from '../../Helpers/logger.js';
+import socketAuthMiddleware from '../../Middleware/socketAuthMiddleware.js';
 
 // Wraps a socket.io handler. If something goes wrong inside a real bug,
 // a malformed payload, a gameService that throws something unexpected it
@@ -9,7 +10,18 @@ import logger from '../../Helpers/logger.js';
 // games, not just the one who caused the bug.
 export const safeSocketHandler = (socket, eventName, handler) => async (payload) => {
     try {
-        await handler(payload);
+        // Reuse handshake authentication so an expired or logged-out token cannot act.
+        const authError = await new Promise((resolve) => socketAuthMiddleware(socket, resolve));
+        if (authError) {
+            socket.emit('error', { event: eventName, message: authError.message });
+            return;
+        }
+        const data = payload ?? {};
+        if (typeof data !== 'object' || Array.isArray(data)) {
+            socket.emit('error', { event: eventName, message: 'Payload must be a JSON object' });
+            return;
+        }
+        await handler(data);
     } catch (err) {
         logger.error(`Socket event "${eventName}" (user ${socket.user?.id ?? 'unknown'}) threw an unexpected error:`);
         logger.error(err);
