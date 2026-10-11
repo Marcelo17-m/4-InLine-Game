@@ -1,46 +1,25 @@
 import TableLayout from '../TableLayout/TableLayout.jsx';
+import GameLogo from '../GameLogo/GameLogo.jsx';
 import styles from './MainMenu.module.css';
-
-// Cada opción de "entrar al juego" usa uno de los colores oficiales de UNO.
-// El verde queda reservado para el fieltro de fondo (para que no se pierda
-// contra él), así que el menú no fuerza un 4to color solo por simetría.
-const MENU_ITEMS = [
-  { key: 'login', label: 'Iniciar sesión', variant: styles.red },
-  { key: 'register', label: 'Registrarse', variant: styles.blue },
-];
 
 function MainMenu({ onNavigate }) {
   return (
     <TableLayout>
-      <div className={styles.titleWrap}>
-        <span className={styles.fanCard} data-card="1" />
-        <span className={styles.fanCard} data-card="2" />
-        <span className={styles.fanCard} data-card="3" />
-        <h1 className={styles.title}>UNO</h1>
-      </div>
-
+      <p className={styles.eyebrow}>UN CLÁSICO. UNA NUEVA PARTIDA.</p>
+      <h1 className={styles.brand}><GameLogo /></h1>
+      <p className={styles.description}>Cuatro fichas. Una línea. Tu próxima victoria.</p>
       <nav className={styles.menu} aria-label="Menú principal">
-        {MENU_ITEMS.map((item, index) => (
-          <button
-            key={item.key}
-            type="button"
-            className={`${styles.cardButton} ${item.variant}`}
-            style={{ '--i': index }}
-            onClick={() => onNavigate?.(item.key)}
-          >
-            {item.label}
-          </button>
-        ))}
-
-        <button
-          type="button"
-          className={styles.exitLink}
-          style={{ '--i': MENU_ITEMS.length }}
-          onClick={() => onNavigate?.('exit')}
-        >
-          Salir
+        <button type="button" className={styles.primary} onClick={() => onNavigate('login')}>
+          Iniciar sesión <span aria-hidden="true">→</span>
+        </button>
+        <button type="button" className={styles.secondary} onClick={() => onNavigate('register')}>
+          Crear cuenta
         </button>
       </nav>
+      <div className={styles.footer}>
+        <span aria-hidden="true" className={styles.discs}>● ● ● ●</span>
+        <span>Conecta cuatro. Comparte la diversión.</span>
+      </div>
     </TableLayout>
   );
 }

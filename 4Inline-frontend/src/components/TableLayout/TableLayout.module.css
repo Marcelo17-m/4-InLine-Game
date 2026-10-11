@@ -1,21 +1,25 @@
-.table {
+.page {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1rem;
-  background: radial-gradient(120% 90% at 50% -10%, rgba(255, 255, 255, 0.05), transparent 60%),
-    var(--table-wood);
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 2.5rem 1.25rem;
+  background:
+    radial-gradient(circle at 50% 20%, #18408b66, transparent 60%),
+    radial-gradient(circle, #80a8ef0d 2px, transparent 3px),
+    var(--navy);
+  background-size: auto, 30px 30px, auto;
 }
-
-/* El "fieltro": panel central que enmarca cada pantalla, como el centro de
-   una mesa de cartas rodeada por el borde de madera (.table) */
-.felt {
-  position: relative;
-  width: min(420px, 100%);
-  padding: 3rem 2rem 2.5rem;
-  border-radius: 28px;
-  background: linear-gradient(180deg, var(--table-felt) 0%, var(--table-felt-dark) 100%);
-  box-shadow: 0 0 0 10px var(--table-wood-edge), 0 30px 60px rgba(0, 0, 0, 0.5),
-    inset 0 2px 0 rgba(255, 255, 255, 0.06);
+.panel {
+  width: min(440px, 100%);
+  padding: 2.5rem;
+  border: 1px solid #527cca66;
+  border-top: 4px solid var(--yellow);
+  border-radius: 26px;
+  background: linear-gradient(150deg, #1b438d, #102951);
+  box-shadow: 0 24px 70px #0000004d, inset 0 1px 0 #ffffff0a;
+}
+@media (max-width: 480px) {
+  .page { padding: 1.5rem 1rem; }
+  .panel { padding: 2rem 1.5rem; border-radius: 22px; }
 }

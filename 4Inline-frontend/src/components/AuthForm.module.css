@@ -1,0 +1,95 @@
+.back {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin: 0 0 1.5rem;
+  padding: 0.35rem 0;
+}
+.back:hover, .link:hover { color: var(--yellow); }
+.title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.2;
+  color: var(--text);
+  text-align: center;
+}
+.subtitle {
+  margin: 0 0 1.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.form { display: flex; flex-direction: column; gap: 1rem; }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.field input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.85rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #7495cd80;
+  background: #091e43;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field input::placeholder { color: #9aaccc; }
+.field input:focus {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 3px #ffda5526;
+}
+.error {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid #ffda5580;
+  border-radius: 8px;
+  background: #ffda550d;
+  color: var(--yellow);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.submit {
+  min-height: 52px;
+  margin-top: 0.4rem;
+  border: 1px solid var(--yellow);
+  border-radius: 12px;
+  padding: 0.9rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--navy);
+  background: var(--yellow);
+  cursor: pointer;
+  box-shadow: 0 4px 0 #c99716;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.submit:hover:not(:disabled) { background: #ffe582; transform: translateY(-2px); }
+.submit:active:not(:disabled) { transform: translateY(1px); }
+.submit:disabled { opacity: 0.65; cursor: wait; }
+.link {
+  display: block;
+  margin: 1.75rem auto 0;
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .field input, .submit { transition: none; }
+}
