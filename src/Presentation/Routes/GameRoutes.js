@@ -5,6 +5,10 @@ import authMiddleware from '../../Middleware/authMiddleware.js';
 const router = Router();
 
 router.post('/', authMiddleware, gameController.create);
+router.post('/all', authMiddleware, gameController.getAll);
+router.post('/by-id', authMiddleware, gameController.getById);
+router.post('/delete', authMiddleware, gameController.deleteGame);
+router.post('/update', authMiddleware, gameController.update);
 router.post('/invitations', authMiddleware, gameController.createInvitation);
 router.post('/invitations/respond', authMiddleware, gameController.respondInvitation);
 router.post('/make-move', authMiddleware, gameController.makeMove);

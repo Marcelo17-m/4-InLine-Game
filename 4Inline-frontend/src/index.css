@@ -1,0 +1,33 @@
+:root {
+  --navy: #08152c;
+  --blue: #2463df;
+  --blue-dark: #163c86;
+  --yellow: #ffda55;
+  --yellow-dark: #efbe28;
+  --text: #f5f8ff;
+  --text-muted: #b7c9eb;
+  --font-display: 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Work Sans', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--navy);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; }
+button { touch-action: manipulation; }
+button:focus-visible, a:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 5px;
+}
+.emptyScreen {
+  min-height: 100vh;
+  min-height: 100svh;
+  background: var(--navy);
+}

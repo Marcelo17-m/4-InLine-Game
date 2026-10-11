@@ -16,6 +16,15 @@ export const createAuthValidator = ({ userRepository, hashProvider }) => {
         }
         return Result.Ok(data);
     };
+
+    const validateEmailNotTaken = async (data) => {
+        if (data.email == null) return Result.Ok(data);
+        const existingEmail = await userRepository.findByEmail(data.email);
+        if (existingEmail) {
+            return Result.Err({ statusCode: 409, message: 'Email already exists' });
+        }
+        return Result.Ok(data);
+    };
  
     const validateLoginFieldsProvided = async (data) => {
         if (!data.username || !data.password) {
@@ -79,5 +88,6 @@ export const createAuthValidator = ({ userRepository, hashProvider }) => {
         validateUserExists,
         validateUserCanDeleteAccount,
         validateTokenProvided,
+        validateEmailNotTaken
     };
 };

@@ -89,6 +89,88 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
         return Result.Ok({ ...data, row });
     };
 
+    const validateGameCreator = async (data) => {
+        if (Number(data.game.creatorId) !== data.userId) {
+            return Result.Err({ statusCode: 403, message: 'Only the creator can update or delete this game' });
+        }
+        return Result.Ok(data);
+    };
+
+    const validateUpdateFields = async (data) => {
+        const { updates } = data;
+        const allowed = ['board', 'state', 'currentPlayerId', 'winnerId', 'finishReason'];
+        if (!updates || typeof updates !== 'object' || Array.isArray(updates) || !Object.keys(updates).length) {
+            return Result.Err({ statusCode: 400, message: 'updates must be a non-empty object' });
+        }
+        if (Object.keys(updates).some((field) => !allowed.includes(field))) {
+            return Result.Err({ statusCode: 400, message: 'Only board, state, currentPlayerId, winnerId and finishReason can be updated' });
+        }
+        const changes = { ...updates };
+        for (const field of ['currentPlayerId', 'winnerId']) {
+            if (Object.hasOwn(changes, field) && changes[field] !== null) {
+                const id = Number(changes[field]);
+                if (!['number', 'string'].includes(typeof changes[field]) || !Number.isSafeInteger(id) || id <= 0) {
+                    return Result.Err({ statusCode: 400, message: field + ' must be a positive integer or null' });
+                }
+                changes[field] = id;
+            }
+        }
+        return Result.Ok({ ...data, updates: changes });
+    };
+
+    const validateUpdatedBoard = async (data) => {
+        if (Object.hasOwn(data.updates, 'board')) {
+            const { board } = data.updates;
+            if (!Array.isArray(board) || board.length !== helpers.ROWS ||
+                Array.from(board).some((row) => !Array.isArray(row) || row.length !== helpers.COLUMNS ||
+                    Array.from(row).some((cell) => ![0, 1, 2].includes(cell)))) {
+                return Result.Err({ statusCode: 400, message: 'board must be a 6 by 7 matrix containing only 0, 1 and 2' });
+            }
+        }
+        return Result.Ok(data);
+    };
+
+    const validateUpdatedGameState = async (data) => {
+        const proposed = {
+            state: data.game.state, currentPlayerId: data.game.currentPlayerId,
+            winnerId: data.game.winnerId, finishReason: data.game.finishReason,
+            ...data.updates,
+        };
+        if (!['pending', 'in_progress', 'finished', 'rejected'].includes(proposed.state)) {
+            return Result.Err({ statusCode: 400, message: 'Invalid game state' });
+        }
+        const players = await gamePlayerRepository.findByGameId(data.gameId);
+        if (proposed.currentPlayerId != null && !players.some((player) =>
+            Number(player.userId) === proposed.currentPlayerId && player.invitationStatus === 'accepted')) {
+            return Result.Err({ statusCode: 400, message: 'The current player must be an accepted participant' });
+        }
+        if (proposed.winnerId != null && !players.some((player) => Number(player.userId) === proposed.winnerId)) {
+            return Result.Err({ statusCode: 400, message: 'The winner must belong to this game' });
+        }
+        if (proposed.state === 'in_progress') {
+            if (players.length !== 2 || players.some((player) => player.invitationStatus !== 'accepted') ||
+                new Set(players.map((player) => player.piece)).size !== 2 ||
+                players.some((player) => !['R', 'Y'].includes(player.piece)) || proposed.currentPlayerId == null) {
+                return Result.Err({ statusCode: 400, message: 'An active game requires two accepted players and a current player' });
+            }
+        } else if (proposed.currentPlayerId != null) {
+            return Result.Err({ statusCode: 400, message: 'Only an active game can have a current player' });
+        }
+        if (proposed.state === 'finished') {
+            if (!['four_in_line', 'draw', 'abandoned'].includes(proposed.finishReason) ||
+                ((proposed.finishReason === 'draw') !== (proposed.winnerId == null))) {
+                return Result.Err({ statusCode: 400, message: 'A finished game requires a valid reason and a winner, except for a draw' });
+            }
+        } else if (proposed.state === 'rejected') {
+            if (proposed.finishReason !== 'rejected' || proposed.winnerId != null) {
+                return Result.Err({ statusCode: 400, message: 'A rejected game requires reason rejected and no winner' });
+            }
+        } else if (proposed.winnerId != null || proposed.finishReason != null) {
+            return Result.Err({ statusCode: 400, message: 'An unfinished game cannot have a winner or finish reason' });
+        }
+        return Result.Ok({ ...data, proposed });
+    };
+
     const validateCreateInvitationInput = async (data) => {
         const creatorId = Number(data.creatorId);
         const opponentId = Number(data.opponentId);
@@ -131,5 +213,6 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
         validateGameExistsByGameId, validateUserIsInGame, validateAcceptedPlayer,
         validateGameInProgress, validateTwoPlayers, validateIsPlayerTurn, validateColumnHasSpace,
         validateCreateInvitationInput, validateRespondInvitationInput,
+        validateGameCreator, validateUpdateFields, validateUpdatedBoard, validateUpdatedGameState,
     };
 };

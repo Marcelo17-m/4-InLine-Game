@@ -54,14 +54,14 @@ describe('Connect Four invitation persistence flow', () => {
 
         const accepted = await service.respondInvitation({ gameId, userId: 2, accept: true });
         expect(accepted.isOk()).toBe(true);
-        expect(accepted.value.state).toBe('in_progress');
-        expect(accepted.value.currentPlayerId).toBe(1);
-        expect(accepted.value.players).toHaveLength(2);
-        expect((await gameRepository.findById(gameId)).state).toBe('in_progress');
+        expect(accepted.value).toEqual({ message: 'Invitation accepted successfully', status: 'ACCEPTED' });
+        expect(await gameRepository.findById(gameId)).toMatchObject({ state: 'in_progress', currentPlayerId: 1 });
+        expect((await gamePlayerRepository.findByGameId(gameId)).map((player) => player.invitationStatus))
+            .toEqual(['accepted', 'accepted']);
         expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('accepted');
     });
 
-    it('rejects an invitation and prevents the players from starting another pending game', async () => {
+    it('blocks another invitation while pending and frees the players after rejection', async () => {
         const created = await service.createInvitation({ creatorId: 1, opponentId: 2 });
         const gameId = created.value.gameId;
 
@@ -71,8 +71,9 @@ describe('Connect Four invitation persistence flow', () => {
 
         const rejected = await service.respondInvitation({ gameId, userId: 2, accept: false });
         expect(rejected.isOk()).toBe(true);
-        expect(rejected.value.state).toBe('rejected');
+        expect(rejected.value).toEqual({ message: 'Invitation rejected', status: 'REJECTED' });
         expect((await gameRepository.findById(gameId)).finishReason).toBe('rejected');
         expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('rejected');
+        expect((await service.createInvitation({ creatorId: 1, opponentId: 3 })).isOk()).toBe(true);
     });
 });

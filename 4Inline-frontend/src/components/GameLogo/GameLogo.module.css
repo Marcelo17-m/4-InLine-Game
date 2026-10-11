@@ -1,0 +1,29 @@
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.name {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  color: var(--yellow);
+  white-space: nowrap;
+}
+.name span { color: var(--text); }
+.logo img { filter: drop-shadow(0 8px 0 #07193266); }
+.compact {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1.75rem;
+}
+.compact img { width: 48px; height: auto; }
+.compact .name { font-size: 1.3rem; letter-spacing: 0; }
+@media (max-width: 360px) {
+  .name { font-size: 2.3rem; }
+}

@@ -17,6 +17,10 @@ class UserRepository {
         return User.scope('withPasswordHash').findOne({ where: { username } });
     }
 
+    async findByEmail(email) {
+        return User.findOne({ where: { email } });
+    }
+
     async update(id, data) {
         const user = await User.findByPk(id);
         if(!user){

@@ -44,8 +44,11 @@ beforeEach(async () => {
 });
 afterAll(() => sequelize.close());
 
-test('exposes creation, moves and abandonment', () => {
-    expect(Object.keys(service).sort()).toEqual(['createGame', 'leaveGame', 'makeMove']);
+test('exposes game CRUD, moves, abandonment and invitation operations', () => {
+    expect(Object.keys(service).sort()).toEqual([
+        'createGame', 'createInvitation', 'deleteGame', 'getAllGames', 'getGameById', 'getGameForPlayer',
+        'leaveGame', 'makeMove', 'respondInvitation', 'updateGame',
+    ]);
 });
 
 test('creates a pending game with an empty board and the authenticated creator as red', async () => {
@@ -84,9 +87,9 @@ test('each created game receives an independent empty board', async () => {
 });
 
 test('exposes Connect Four operations and invitation lifecycle', () => {
-    expect(Object.keys(service).sort()).toEqual([
+    expect(Object.keys(service)).toEqual(expect.arrayContaining([
         'createInvitation', 'leaveGame', 'makeMove', 'respondInvitation',
-    ]);
+    ]));
 });
 
 test('rejects moves and abandonment while a game is pending', async () => {
@@ -154,7 +157,10 @@ test.each([
         state = value(await move(initial.gameId, i % 2 ? yellow.id : red.id, columns[i]));
         if (i < columns.length - 1) expect(state.state).toBe('in_progress');
     }
-    expect(state).toMatchObject({ state: 'finished', winnerId: red.id, currentPlayerId: null, finishReason: 'four_in_line' });
+    expect(state).toMatchObject({
+        state: 'finished', winnerId: red.id, currentPlayerId: null, finishReason: 'four_in_line',
+        message: 'red won the game!', winner: { userId: red.id, username: 'red', piece: 'R' },
+    });
     expect(state.finishedAt).toBeInstanceOf(Date);
     expect(await History.count({ where: { eventType: 'finished' } })).toBe(1);
     expectError(await move(state.gameId, yellow.id, 4), 409, 'The game is not in progress');
@@ -170,6 +176,7 @@ test('a full board without four in line ends in a draw', async () => {
     await gameRepository.update(state.gameId, { board, currentPlayerId: yellow.id });
     const draw = value(await move(state.gameId, yellow.id, 6));
     expect(draw).toMatchObject({ state: 'finished', winnerId: null, currentPlayerId: null, finishReason: 'draw' });
+    expect(draw).not.toHaveProperty('winner');
     expect(helpers.countMoves(draw.board)).toBe(42);
     expect((await History.findOne({ where: { eventType: 'move' } })).moveNumber).toBe(42);
 });

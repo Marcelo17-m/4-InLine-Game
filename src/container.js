@@ -16,6 +16,7 @@ import { createGameService} from './Logic/Services/GameService.js';
 import { createGameRules} from './Logic/Validators/GameValidatorRules.js';
 import * as connectFourRules from './Helpers/connectFourRules.js';
 import { createStatsService } from './Logic/Services/StatsService.js';
+import { createGameEvents } from './Presentation/Sockets/gameEvents.js';
 import _ from 'lodash';
 
 const hashProvider = {
@@ -59,6 +60,8 @@ export const gameService = createGameService({
     gameRules,
     helpers: connectFourRules,
 });
+
+export const gameEvents = createGameEvents({ gameService });
 
 export const statsApiService = createStatsService({
     apiStatsRepository,

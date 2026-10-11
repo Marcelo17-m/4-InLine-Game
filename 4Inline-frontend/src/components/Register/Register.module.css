@@ -1,0 +1,8 @@
+.back { composes: back from '../AuthForm.module.css'; }
+.title { composes: title from '../AuthForm.module.css'; }
+.subtitle { composes: subtitle from '../AuthForm.module.css'; }
+.form { composes: form from '../AuthForm.module.css'; }
+.field { composes: field from '../AuthForm.module.css'; }
+.error { composes: error from '../AuthForm.module.css'; }
+.submit { composes: submit from '../AuthForm.module.css'; }
+.link { composes: link from '../AuthForm.module.css'; }

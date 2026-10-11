@@ -8,6 +8,10 @@ import { revoke } from '../../Middleware/tokenBlacklist.js';
 import { createEmptyBoard } from '../../Helpers/connectFourRules.js';
 
 jest.mock('../../container.js', () => ({
+    gameEvents: {
+        publishState: jest.fn(), invitationCreated: jest.fn(), invitationResponded: jest.fn(),
+        refreshState: jest.fn(), gameDeleted: jest.fn(),
+    },
     gameService: {
         createGame: jest.fn(), createInvitation: jest.fn(), respondInvitation: jest.fn(), makeMove: jest.fn(), leaveGame: jest.fn(),
     },
@@ -120,7 +124,7 @@ test('POST /invitations/respond uses authenticated recipient and requested decis
         game_id: 31, accept: true, user_id: 99, access_token: tokenFor(),
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual(stateAfterAccept);
     expect(gameService.respondInvitation).toHaveBeenCalledWith({ gameId: 31, userId: 1, accept: true });
 });
