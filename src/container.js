@@ -47,7 +47,7 @@ export const authService = createAuthService({
 });
 
 const gameValidator = createGameValidator({
-    gameRepository, gamePlayerRepository, userRepository, helpers: connectFourRules,
+    gameRepository, gamePlayerRepository, invitationRepository, userRepository, helpers: connectFourRules,
 });
 const gameRules = createGameRules(gameValidator);
 
