@@ -36,6 +36,7 @@ export const create = async (req, res, next) => {
 
 export const createInvitation = async (req, res) => {
     const result = await gameService.createInvitation({
+        gameId: req.body?.game_id,
         creatorId: req.user.id,
         opponentId: req.body?.opponent_id,
     });
@@ -53,6 +54,12 @@ export const respondInvitation = async (req, res) => {
         gameId: req.body.game_id, userId: req.user.id, response: result.value,
     });
     return handleResult(res, result, 201);
+};
+
+export const start = async (req, res) => {
+    const result = await gameService.startGame({ gameId: req.body?.game_id, userId: req.user.id });
+    if (result.isOk()) await gameEvents.publishState(result.value);
+    return handleResult(res, result);
 };
 
 export const makeMove = async (req, res, next) => {
