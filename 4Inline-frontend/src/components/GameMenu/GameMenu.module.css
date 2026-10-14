@@ -1,162 +1,100 @@
-.titleWrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 2.5rem;
-}
-
 .title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 3rem;
-  letter-spacing: 0.05em;
-  color: var(--cream);
-  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
-  animation: fade-in 0.5s ease-out both;
-}
-
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  align-items: stretch;
-  max-width: 320px;
-  margin: 0 auto;
-}
-
-.cardButton {
-  --tilt: -2deg;
-  position: relative;
-  border: 3px solid var(--cream);
-  border-radius: 16px;
-  padding: 1.25rem;
+  margin: 0 0 0.5rem;
+  text-align: center;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: 0.02em;
-  color: var(--cream);
-  cursor: pointer;
-  transform: rotate(var(--tilt));
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
-  animation: deal-in 0.5s ease-out both;
+  font-size: 2rem;
+  line-height: 1.2;
 }
-
-.cardButton:nth-child(even) {
-  --tilt: 2deg;
+.description {
+  margin: 0 0 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
-
-.cardButton:hover,
-.cardButton:focus-visible {
-  transform: rotate(0deg) translateY(-4px);
-  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.25);
-}
-
-.red {
-  background: linear-gradient(180deg, var(--uno-red), var(--uno-red-dark));
-}
-
-.blue {
-  background: linear-gradient(180deg, var(--uno-blue), var(--uno-blue-dark));
-}
-
-.yellow {
-  background: linear-gradient(180deg, var(--uno-yellow), var(--uno-yellow-dark));
-  color: #241a02;
-}
-
-.joinForm {
-  display: flex;
-  gap: 0.5rem;
-  animation: deal-in 0.3s ease-out both;
-  transform-origin: top center;
-}
-
-.joinInput {
-  flex: 1;
+.create, .join {
   width: 100%;
-  padding: 0.85rem 1rem;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
   border-radius: 12px;
-  border: 3px solid var(--cream);
-  background: rgba(255, 255, 255, 0.95);
-  font-family: var(--font-body);
-  font-size: 1.1rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  text-align: center;
-  color: #333;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-
-.joinInput:focus {
-  border-color: var(--uno-yellow);
-}
-
-.joinSubmit {
-  background: linear-gradient(180deg, var(--uno-yellow), var(--uno-yellow-dark));
-  color: #241a02;
-  border: 3px solid var(--cream);
-  border-radius: 12px;
-  padding: 0 1.25rem;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.1rem;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: background 150ms ease, transform 150ms ease;
 }
-
-.joinSubmit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+.create {
+  color: var(--navy);
+  background: var(--yellow);
+  border: 1px solid var(--yellow);
+  box-shadow: 0 4px 0 #c99716;
 }
-
-.exitLink {
-  margin-top: 1rem;
-  background: none;
-  border: none;
-  color: rgba(244, 239, 226, 0.6);
-  font-family: var(--font-body);
+.create > span { font-size: 1.4rem; line-height: 1; }
+.create:hover:not(:disabled) { background: #ffe582; transform: translateY(-2px); }
+.join { background: var(--blue); border: 1px solid #739ded; color: var(--text); }
+.join:hover:not(:disabled) { background: #3475ed; transform: translateY(-2px); }
+.create:disabled, .join:disabled { opacity: 0.65; cursor: wait; }
+.divider { display: flex; align-items: center; gap: 0.75rem; margin: 2rem 0 1.5rem; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #739ded40; }
+.divider span { color: var(--text-muted); font-size: 0.6rem; letter-spacing: 0.08em; }
+.joinForm { display: grid; gap: 0.75rem; }
+.label { color: var(--text); font-size: 0.8rem; }
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid #7495cd80;
+  border-radius: 10px;
+  background: #091e43;
+  color: var(--text);
   font-size: 1rem;
-  text-decoration: underline;
-  cursor: pointer;
-  animation: fade-in 0.5s ease-out both;
-  animation-delay: 0.2s;
+  outline: none;
 }
-
-.exitLink:hover,
-.exitLink:focus-visible {
-  color: var(--cream);
+.input::placeholder { color: #9aaccc; }
+.input:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px #ffda5526; }
+.join { margin-top: 0.25rem; }
+.toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: min(400px, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid #739ded;
+  border-left: 4px solid var(--yellow);
+  border-radius: 14px;
+  background: #102951;
+  color: var(--text);
+  box-shadow: 0 12px 32px #00000055;
+  animation: appear 180ms ease-out;
 }
-
-@keyframes deal-in {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-  }
+.toast[data-type='error'] { border-left-color: #ffb4a8; }
+.toastIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--navy);
+  font-weight: 700;
 }
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.errorText {
-  color: var(--uno-red);
-  background: rgba(0, 0, 0, 0.7);
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-weight: bold;
-  text-align: center;
-  margin-top: 0.5rem;
-  font-family: var(--font-body);
-}
-
+.toast[data-type='error'] .toastIcon { background: #ffb4a8; }
+.toastText { flex: 1; min-width: 0; font-size: 0.85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.toastText p { margin: 0; }
+.toastText strong { display: block; margin-top: 0.3rem; color: var(--yellow); }
+.dismiss { padding: 0 0.3rem; background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; }
+.dismiss:hover { color: var(--text); }
+@keyframes appear { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .cardButton, .title, .exitLink, .joinForm {
-    animation: none;
-  }
+  .toast { animation: none; }
+  .create, .join { transition: none; }
 }
