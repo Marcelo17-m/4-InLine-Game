@@ -58,10 +58,10 @@ class GamePlayerRepository {
         return updated === 1;
     }
 
-    async delete(id) {
-        const player = await GamePlayer.findByPk(id);
+    async delete(id, transaction) {
+        const player = await GamePlayer.findByPk(id, { transaction });
         if (!player) return null;
-        await player.destroy();
+        await player.destroy({ transaction });
         return true;
     }
 }
