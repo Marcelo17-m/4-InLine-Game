@@ -1,4 +1,5 @@
 import sequelize from '../../Data Access/database.js';
+import { Game, GamePlayer, Invitation } from '../../Data Access/Models/index.js';
 import gameRepository from '../../Data Access/Repositories/GameRepository.js';
 import gamePlayerRepository from '../../Data Access/Repositories/GameplayerRepository.js';
 import historyRepository from '../../Data Access/Repositories/HistoryRepository.js';
@@ -9,71 +10,137 @@ import { createGameValidator } from '../../Logic/Validators/GameValidator.js';
 import { createGameRules } from '../../Logic/Validators/GameValidatorRules.js';
 import * as helpers from '../../Helpers/connectFourRules.js';
 
-const validator = createGameValidator({ gameRepository, gamePlayerRepository, userRepository, helpers });
-const gameRules = createGameRules(validator);
-const service = createGameService({
-    gameRepository,
-    gamePlayerRepository,
-    historyRepository,
-    invitationRepository,
-    sequelize,
-    gameRules,
-    helpers,
+const dependencies = { gameRepository, gamePlayerRepository, invitationRepository, userRepository, helpers };
+const gameRules = createGameRules(createGameValidator(dependencies));
+const service = createGameService({ ...dependencies, historyRepository, sequelize, gameRules });
+const create = async () => {
+    const result = await service.createGame({ creatorId: 1 });
+    expect(result.isOk()).toBe(true);
+    return result.value.gameId;
+};
+const invite = (gameId, opponentId = 2) => service.createInvitation({ gameId, creatorId: 1, opponentId });
+
+beforeEach(async () => {
+    jest.restoreAllMocks();
+    await sequelize.sync({ force: true });
+    for (const username of ['alice', 'bob', 'carol']) {
+        await userRepository.create({ username, passwordHash: 'test-only-hash' });
+    }
+});
+afterAll(() => sequelize.close());
+
+test('creates one waiting game with its creator, then invites and starts that same game', async () => {
+    const gameId = await create();
+    expect(await gamePlayerRepository.findByGameId(gameId)).toEqual([
+        expect.objectContaining({ userId: 1, piece: 'R', invitationStatus: 'accepted' }),
+    ]);
+    const invitation = await invite(gameId);
+    expect(invitation.isOk()).toBe(true);
+    expect(invitation.value.gameId).toBe(gameId);
+    expect(await Game.count()).toBe(1);
+    expect(await gameRepository.findById(gameId)).toMatchObject({
+        state: 'pending', currentPlayerId: null, board: helpers.createEmptyBoard(),
+    });
+    expect((await gamePlayerRepository.findByGameId(gameId)).map((p) => [p.userId, p.invitationStatus]))
+        .toEqual([[1, 'accepted'], [2, 'invited']]);
+    const accepted = await service.respondInvitation({ gameId, userId: 2, accept: true });
+    expect(accepted.value).toEqual({ message: 'Invitation accepted successfully', status: 'ACCEPTED' });
+    expect(await gameRepository.findById(gameId)).toMatchObject({ state: 'pending', currentPlayerId: null });
+    expect((await service.makeMove({ gameId, userId: 1, column: 0 })).error.statusCode).toBe(409);
+    expect((await service.startGame({ gameId, userId: 1 })).isOk()).toBe(true);
+    expect(await gameRepository.findById(gameId)).toMatchObject({ state: 'in_progress', currentPlayerId: 1 });
+    expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('accepted');
+    expect((await service.makeMove({ gameId, userId: 1, column: 0 })).isOk()).toBe(true);
 });
 
-describe('Connect Four invitation persistence flow', () => {
-    beforeEach(async () => {
-        await sequelize.sync({ force: true });
-        await userRepository.create({ username: 'alice', passwordHash: 'hash-a' });
-        await userRepository.create({ username: 'bob', passwordHash: 'hash-b' });
-        await userRepository.create({ username: 'carol', passwordHash: 'hash-c' });
+test('blocks duplicate games and invitations while pending or active', async () => {
+    const gameId = await create();
+    expect((await service.createGame({ creatorId: 1 })).error.statusCode).toBe(409);
+    await invite(gameId);
+    expect((await service.createGame({ creatorId: 2 })).error.statusCode).toBe(409);
+    expect((await invite(gameId, 3)).error.statusCode).toBe(409);
+    await service.respondInvitation({ gameId, userId: 2, accept: true });
+    expect((await service.createGame({ creatorId: 1 })).error.statusCode).toBe(409);
+    expect((await service.createGame({ creatorId: 2 })).error.statusCode).toBe(409);
+    expect((await invite(gameId, 3)).error.statusCode).toBe(409);
+    expect(await Game.count()).toBe(1);
+    expect(await GamePlayer.count()).toBe(2);
+    expect(await Invitation.count()).toBe(1);
+});
+
+test('rejection preserves the game and invitation history and permits a different opponent', async () => {
+    const gameId = await create();
+    await invite(gameId);
+    const rejected = await service.respondInvitation({ gameId, userId: 2, accept: false });
+    expect(rejected.value).toEqual({ message: 'Invitation rejected', status: 'REJECTED' });
+    expect(await gameRepository.findById(gameId)).toMatchObject({
+        state: 'pending', currentPlayerId: null, winnerId: null, finishReason: null, finishedAt: null,
     });
+    expect(await GamePlayer.count({ where: { gameId } })).toBe(1);
+    expect((await invitationRepository.findByGameId(gameId))[0]).toMatchObject({ status: 'rejected', recipientId: 2 });
+    expect((await service.getGameForPlayer({ gameId, userId: 2 })).error.statusCode).toBe(403);
+    expect((await invite(gameId, 2)).error.message).toMatch(/already been invited/);
+    expect((await invite(gameId, 3)).isOk()).toBe(true);
+    expect((await service.respondInvitation({ gameId, userId: 3, accept: true })).isOk()).toBe(true);
+    expect((await gamePlayerRepository.findByGameId(gameId)).map((p) => p.userId)).toEqual([1, 3]);
+    expect((await invitationRepository.findByGameId(gameId)).map((i) => i.status)).toEqual(['rejected', 'accepted']);
+    expect(await Game.count()).toBe(1);
+    expect((await service.createGame({ creatorId: 2 })).isOk()).toBe(true);
+});
 
-    afterAll(async () => {
-        await sequelize.close();
-    });
+test('rejects invitation requests without creating an implicit game', async () => {
+    expect((await invite(undefined)).error.statusCode).toBe(400);
+    expect((await invite(999)).error.statusCode).toBe(404);
+    expect(await Game.count()).toBe(0);
+    const gameId = await create();
+    expect((await service.createInvitation({ gameId, creatorId: 2, opponentId: 3 })).error.statusCode).toBe(403);
+    await service.createGame({ creatorId: 2 });
+    expect((await invite(gameId, 2)).error.message).toMatch(/opponent already/);
+    expect(await Invitation.count()).toBe(0);
+});
 
-    it('creates a pending invitation and accepts it into an empty Connect Four game', async () => {
-        const created = await service.createInvitation({ creatorId: 1, opponentId: 2 });
-        expect(created.isOk()).toBe(true);
+test('a finished game no longer prevents another game', async () => {
+    const gameId = await create();
+    await invite(gameId);
+    await service.respondInvitation({ gameId, userId: 2, accept: true });
+    await service.startGame({ gameId, userId: 1 });
+    await service.leaveGame({ gameId, userId: 2 });
+    expect((await service.createGame({ creatorId: 1 })).isOk()).toBe(true);
+    expect((await service.createGame({ creatorId: 2 })).isOk()).toBe(true);
+});
 
-        const gameId = created.value.gameId;
-        const game = await gameRepository.findById(gameId);
-        const players = await gamePlayerRepository.findByGameId(gameId);
-        const [invitation] = await invitationRepository.findByGameId(gameId);
-        expect(game.state).toBe('pending');
-        expect(game.currentPlayerId).toBeNull();
-        expect(game.board).toEqual(helpers.createEmptyBoard());
-        expect(players.map(({ userId, piece, turnOrder, invitationStatus }) => ({
-            userId, piece, turnOrder, invitationStatus,
-        }))).toEqual([
-            { userId: 1, piece: 'R', turnOrder: 0, invitationStatus: 'accepted' },
-            { userId: 2, piece: 'Y', turnOrder: 1, invitationStatus: 'invited' },
-        ]);
-        expect(invitation.status).toBe('pending');
+test('only the creator can start, after both players accept, and never restart', async () => {
+    const gameId = await create();
+    expect((await service.startGame({ gameId, userId: 1 })).error.statusCode).toBe(409);
+    await invite(gameId);
+    expect((await service.startGame({ gameId, userId: 1 })).error.statusCode).toBe(409);
+    await service.respondInvitation({ gameId, userId: 2, accept: true });
+    expect((await service.startGame({ gameId, userId: 2 })).error.statusCode).toBe(403);
+    expect((await service.startGame({ gameId, userId: 3 })).error.statusCode).toBe(403);
+    expect((await service.startGame({ gameId, userId: 1 })).value).toMatchObject({ state: 'in_progress', currentPlayerId: 1 });
+    await service.makeMove({ gameId, userId: 1, column: 2 });
+    expect((await service.startGame({ gameId, userId: 1 })).error.statusCode).toBe(409);
+    expect(await gameRepository.findById(gameId)).toMatchObject({ currentPlayerId: 2 });
+    await service.leaveGame({ gameId, userId: 2 });
+    expect((await service.startGame({ gameId, userId: 1 })).error.statusCode).toBe(409);
+});
 
-        const accepted = await service.respondInvitation({ gameId, userId: 2, accept: true });
-        expect(accepted.isOk()).toBe(true);
-        expect(accepted.value).toEqual({ message: 'Invitation accepted successfully', status: 'ACCEPTED' });
-        expect(await gameRepository.findById(gameId)).toMatchObject({ state: 'in_progress', currentPlayerId: 1 });
-        expect((await gamePlayerRepository.findByGameId(gameId)).map((player) => player.invitationStatus))
-            .toEqual(['accepted', 'accepted']);
-        expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('accepted');
-    });
+test('an invitation write failure rolls back the opponent while retaining the waiting game', async () => {
+    const gameId = await create();
+    jest.spyOn(invitationRepository, 'create').mockRejectedValueOnce(new Error('Write failed'));
+    expect((await invite(gameId)).isErr()).toBe(true);
+    expect(await Game.count()).toBe(1);
+    expect(await GamePlayer.count()).toBe(1);
+    expect(await Invitation.count()).toBe(0);
+    expect((await invite(gameId)).isOk()).toBe(true);
+});
 
-    it('blocks another invitation while pending and frees the players after rejection', async () => {
-        const created = await service.createInvitation({ creatorId: 1, opponentId: 2 });
-        const gameId = created.value.gameId;
-
-        const secondInvitation = await service.createInvitation({ creatorId: 1, opponentId: 3 });
-        expect(secondInvitation.isErr()).toBe(true);
-        expect(secondInvitation.error.statusCode).toBe(409);
-
-        const rejected = await service.respondInvitation({ gameId, userId: 2, accept: false });
-        expect(rejected.isOk()).toBe(true);
-        expect(rejected.value).toEqual({ message: 'Invitation rejected', status: 'REJECTED' });
-        expect((await gameRepository.findById(gameId)).finishReason).toBe('rejected');
-        expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('rejected');
-        expect((await service.createInvitation({ creatorId: 1, opponentId: 3 })).isOk()).toBe(true);
-    });
+test('a failed rejection rolls back the invitation response and retains the opponent', async () => {
+    const gameId = await create();
+    await invite(gameId);
+    jest.spyOn(gamePlayerRepository, 'delete').mockRejectedValueOnce(new Error('Delete failed'));
+    expect((await service.respondInvitation({ gameId, userId: 2, accept: false })).isErr()).toBe(true);
+    expect((await invitationRepository.findByGameId(gameId))[0].status).toBe('pending');
+    expect((await gamePlayerRepository.findByGameAndUser(gameId, 2)).invitationStatus).toBe('invited');
+    expect((await service.respondInvitation({ gameId, userId: 2, accept: false })).isOk()).toBe(true);
 });

@@ -14,6 +14,7 @@ describe('GameService invitations', () => {
     const emptyBoard = () => Array.from({ length: 6 }, () => Array(7).fill(0));
     const normalizedCreateInput = (data) => ({
         ...data,
+        gameId: Number(data.gameId),
         creatorId: Number(data.creatorId),
         opponentId: Number(data.opponentId),
         creator: { id: Number(data.creatorId), username: `user-${data.creatorId}` },
@@ -28,6 +29,7 @@ describe('GameService invitations', () => {
         };
         gamePlayerRepository = {
             create: jest.fn().mockResolvedValue({}),
+            delete: jest.fn().mockResolvedValue(true),
             findByGameAndUser: jest.fn(),
             findByGameId: jest.fn(),
             updateInvitationStatus: jest.fn().mockResolvedValue(true),
@@ -77,8 +79,8 @@ describe('GameService invitations', () => {
     });
 
     describe('createInvitation', () => {
-        it('creates a pending game, players, and invitation in one transaction', async () => {
-            const result = await service.createInvitation({ creatorId: '1', opponentId: '2' });
+        it('adds only the invited player and invitation to the existing game', async () => {
+            const result = await service.createInvitation({ gameId: 31, creatorId: '1', opponentId: '2' });
 
             expect(result.isOk()).toBe(true);
             expect(result.value).toEqual({
@@ -86,14 +88,9 @@ describe('GameService invitations', () => {
                 opponentId: 2,
                 creator: { id: 1, username: 'user-1' },
             });
-            expect(gameRepository.create).toHaveBeenCalledWith(
-                { creatorId: 1, state: 'pending', currentPlayerId: null },
-                { transaction: expect.objectContaining({ id: 'transaction-1' }) },
-            );
-            expect(gamePlayerRepository.create).toHaveBeenNthCalledWith(1, {
-                gameId: 31, userId: 1, piece: 'R', turnOrder: 0, invitationStatus: 'accepted',
-            }, expect.any(Object));
-            expect(gamePlayerRepository.create).toHaveBeenNthCalledWith(2, {
+            expect(gameRepository.create).not.toHaveBeenCalled();
+            expect(gamePlayerRepository.create).toHaveBeenCalledTimes(1);
+            expect(gamePlayerRepository.create).toHaveBeenCalledWith({
                 gameId: 31, userId: 2, piece: 'Y', turnOrder: 1, invitationStatus: 'invited',
             }, expect.any(Object));
             expect(invitationRepository.create).toHaveBeenCalledWith({
@@ -109,7 +106,7 @@ describe('GameService invitations', () => {
         ])('returns validation errors without opening a transaction', async (error) => {
             gameRules.validateCreateInvitation.mockResolvedValue(Result.Err(error));
 
-            const result = await service.createInvitation({ creatorId: 1, opponentId: 2 });
+            const result = await service.createInvitation({ gameId: 31, creatorId: 1, opponentId: 2 });
 
             expect(result.isErr()).toBe(true);
             expect(result.error).toEqual(error);
@@ -119,7 +116,7 @@ describe('GameService invitations', () => {
         it('reports transaction failures', async () => {
             invitationRepository.create.mockRejectedValue(new Error('database failure'));
 
-            const result = await service.createInvitation({ creatorId: 1, opponentId: 2 });
+            const result = await service.createInvitation({ gameId: 31, creatorId: 1, opponentId: 2 });
 
             expect(result.isErr()).toBe(true);
             expect(result.error.statusCode).toBe(409);
@@ -135,7 +132,7 @@ describe('GameService invitations', () => {
             invitationRepository.findByGameId.mockResolvedValue([
                 { id: 80, gameId: 31, senderId: 1, recipientId: 2, status: 'pending' },
             ]);
-            gamePlayerRepository.findByGameAndUser.mockResolvedValue({ invitationStatus: 'invited' });
+            gamePlayerRepository.findByGameAndUser.mockResolvedValue({ id: 42, invitationStatus: 'invited' });
             gamePlayerRepository.findByGameId.mockResolvedValue([
                 { userId: 1, piece: 'R', invitationStatus: 'accepted' },
                 { userId: 2, piece: 'Y', invitationStatus: 'accepted' },
@@ -147,9 +144,9 @@ describe('GameService invitations', () => {
         };
 
         it.each([
-            [true, 'accepted', { state: 'in_progress', currentPlayerId: 1 }],
-            [false, 'rejected', expect.objectContaining({ state: 'rejected', finishReason: 'rejected', currentPlayerId: null })],
-        ])('persists the response transactionally (accept=%s)', async (accept, status, changes) => {
+            [true, 'accepted'],
+            [false, 'rejected'],
+        ])('persists the response without starting the game (accept=%s)', async (accept, status) => {
             setupPendingInvitation();
 
             const result = await service.respondInvitation({ gameId: 31, userId: 2, accept });
@@ -157,8 +154,15 @@ describe('GameService invitations', () => {
             expect(result.isOk()).toBe(true);
             expect(gameRepository.findByIdForUpdate).toHaveBeenCalledWith(31, expect.objectContaining({ id: 'transaction-1' }));
             expect(invitationRepository.respond).toHaveBeenCalledWith(80, 2, status, expect.any(Object));
-            expect(gamePlayerRepository.updateInvitationStatus).toHaveBeenCalledWith(31, 2, status, expect.any(Object));
-            expect(gameRepository.update).toHaveBeenCalledWith(31, changes, expect.any(Object));
+            if (accept) {
+                expect(gamePlayerRepository.updateInvitationStatus).toHaveBeenCalledWith(31, 2, status, expect.any(Object));
+                expect(gameRepository.update).not.toHaveBeenCalled();
+                expect(gamePlayerRepository.delete).not.toHaveBeenCalled();
+            } else {
+                expect(gamePlayerRepository.delete).toHaveBeenCalledWith(42, expect.any(Object));
+                expect(gameRepository.update).not.toHaveBeenCalled();
+                expect(gamePlayerRepository.updateInvitationStatus).not.toHaveBeenCalled();
+            }
             expect(result.value).toEqual({
                 message: accept ? 'Invitation accepted successfully' : 'Invitation rejected',
                 status: accept ? 'ACCEPTED' : 'REJECTED',

@@ -108,12 +108,12 @@ test('POST /invitations creates an invitation using the authenticated creator', 
     gameService.createInvitation.mockResolvedValue(Result.Ok(invitation));
 
     const response = await request(app).post('/api/games/invitations').send({
-        opponent_id: 2, creator_id: 99, access_token: tokenFor(),
+        game_id: 31, opponent_id: 2, creator_id: 99, access_token: tokenFor(),
     });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual(invitation);
-    expect(gameService.createInvitation).toHaveBeenCalledWith({ creatorId: 1, opponentId: 2 });
+    expect(gameService.createInvitation).toHaveBeenCalledWith({ gameId: 31, creatorId: 1, opponentId: 2 });
 });
 
 test('POST /invitations/respond uses authenticated recipient and requested decision', async () => {
