@@ -28,9 +28,12 @@ export const createGameEvents = ({ gameService }) => {
         if (result.isErr()) throw new Error(result.error.message);
         sendState(result.value);
     });
-    const invitationCreated = (invitation) => notify(() => {
+    const invitationCreated = (invitation) => notify(async () => {
         joinPlayersToGame(io, invitation.gameId, [invitation.creator.id, invitation.opponentId]);
         io.to(userRoom(invitation.opponentId)).emit('game:invitation', invitation);
+        const result = await gameService.getGameById({ gameId: invitation.gameId, userId: invitation.creator.id });
+        if (result.isErr()) throw new Error(result.error.message);
+        sendState(result.value);
     });
     const invitationResponded = ({ gameId, userId, response }) => notify(async () => {
         // The service returns a message/status, so read the saved board separately.
@@ -39,7 +42,11 @@ export const createGameEvents = ({ gameService }) => {
         const state = result.value;
         joinPlayersToGame(io, state.gameId, state.players.map((player) => player.userId));
         const event = response.status === 'ACCEPTED' ? 'game:invitation:accepted' : 'game:invitation:rejected';
-        io.to(gameRoom(state.gameId)).emit(event, { ...response, gameId: state.gameId });
+        io.to(gameRoom(state.gameId)).to(userRoom(userId)).emit(event, { ...response, gameId: state.gameId });
+        if (response.status === 'REJECTED') {
+            // The recipient is no longer a participant; keep only the creator in the waiting room.
+            io.in(userRoom(userId)).socketsLeave(gameRoom(state.gameId));
+        }
         sendState(state);
     });
     const gameDeleted = (response) => notify(() => {

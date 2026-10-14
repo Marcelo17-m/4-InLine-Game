@@ -50,6 +50,7 @@ export const registerGameSocketHandlers = (io) => {
 
         on('game:invite', async (data) => {
             const result = await gameService.createInvitation({
+                gameId: gameIdFrom(data),
                 creatorId: socket.user.id, opponentId: data.opponent_id ?? data.opponentId,
             });
             if (result.isOk()) await gameEvents.invitationCreated(result.value);
@@ -61,6 +62,12 @@ export const registerGameSocketHandlers = (io) => {
             const result = await gameService.respondInvitation({ gameId, userId: socket.user.id, accept: data.accept });
             if (result.isOk()) await gameEvents.invitationResponded({ gameId, userId: socket.user.id, response: result.value });
             emitResult(socket, 'game:invitation:respond', result);
+        });
+
+        on('game:start', async (data) => {
+            const result = await gameService.startGame({ gameId: gameIdFrom(data), userId: socket.user.id });
+            if (result.isOk()) await gameEvents.publishState(result.value);
+            emitResult(socket, 'game:start', result);
         });
 
         on('game:move', async (data) => {
