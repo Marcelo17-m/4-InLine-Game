@@ -20,10 +20,6 @@ export function initSocket() {
   return socketInstance;
 }
 
-export function getSocket() {
-  return socketInstance;
-}
-
 export function disconnectSocket() {
   if (socketInstance) {
     socketInstance.disconnect();

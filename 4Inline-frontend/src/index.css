@@ -26,8 +26,3 @@ button:focus-visible, a:focus-visible {
   outline: 3px solid var(--yellow);
   outline-offset: 5px;
 }
-.emptyScreen {
-  min-height: 100vh;
-  min-height: 100svh;
-  background: var(--navy);
-}
