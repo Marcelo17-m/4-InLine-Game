@@ -38,6 +38,18 @@ export const createGameRules = (gameValidator) => {
     const validateCreateGame = composeAsyncValidators(
         gameValidator.validateAuthenticatedUser,
         gameValidator.validateCreatorExists,
+        gameValidator.validateUserAvailable,
+    );
+
+    const validateStartGame = composeAsyncValidators(
+        gameValidator.validateAuthenticatedUser,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateGameExistsByGameId,
+        gameValidator.validateStartCreator,
+        gameValidator.validateGamePending,
+        gameValidator.validateUserIsInGame,
+        gameValidator.validateAcceptedPlayer,
+        gameValidator.validateTwoPlayers,
     );
 
     const validateMakeMove = composeAsyncValidators(
@@ -65,6 +77,14 @@ export const createGameRules = (gameValidator) => {
 
     const validateCreateInvitation = composeAsyncValidators(
         gameValidator.validateCreateInvitationInput,
+        gameValidator.validateGameIdProvided,
+        gameValidator.validateCreatorExists,
+        gameValidator.validateGameExistsByGameId,
+        gameValidator.validateInvitationGame,
+        gameValidator.validateUserIsInGame,
+        gameValidator.validateAcceptedPlayer,
+        gameValidator.validateInvitationSlotAvailable,
+        gameValidator.validateInvitationPlayersAvailable,
     );
 
     const validateRespondInvitation = composeAsyncValidators(
@@ -72,7 +92,7 @@ export const createGameRules = (gameValidator) => {
     );
 
     return {
-        validateCreateGame, validateMakeMove, validateLeaveGame, validateCreateInvitation, validateRespondInvitation,
+        validateCreateGame, validateStartGame, validateMakeMove, validateLeaveGame, validateCreateInvitation, validateRespondInvitation,
         validateGetAllGames, validateGetGameById, validateGetGameForPlayer, validateDeleteGame, validateUpdateGame,
     };
 };
