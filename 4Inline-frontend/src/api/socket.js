@@ -28,8 +28,11 @@ export function disconnectSocket() {
 }
 
 // The server replies using the command's event name, or emits { event, message } on error.
-export function sendSocketEvent(event, payload = {}) {
+export function sendSocketEvent(event, payload = {}, { requireConnected = false } = {}) {
   const socket = initSocket();
+  if (requireConnected && !socket.connected) {
+    return Promise.reject(new Error('Espera a recuperar la conexión antes de jugar.'));
+  }
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       clearTimeout(timer);
@@ -46,7 +49,8 @@ export function sendSocketEvent(event, payload = {}) {
     };
     const onConnectionError = (error) => fail(error.message || 'No se pudo conectar con el servidor.');
     const onDisconnect = () => fail('Se perdió la conexión. Inténtalo de nuevo.');
-    const send = () => socket.emit(event, payload);
+    // Moves must never be buffered and replayed after a disconnect.
+    const send = () => (requireConnected ? socket.volatile : socket).emit(event, payload);
     const timer = setTimeout(() => fail('El servidor no respondió. Inténtalo de nuevo.'), 10000);
 
     socket.on(event, onSuccess);
