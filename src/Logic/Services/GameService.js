@@ -69,35 +69,28 @@ export const createGameService = ({
         const players = await gamePlayerRepository.findByGameId(game.id);
         return result.map(() => helpers.toGameState(game, players));
     };
-    const createInvitation = async ({ creatorId, opponentId }) => {
-        const validation = await gameRules.validateCreateInvitation({ creatorId, opponentId });
+    const createInvitation = async ({ gameId, creatorId, opponentId }) => {
+        const validation = await gameRules.validateCreateInvitation({ gameId, creatorId, opponentId });
         if (validation.isErr()) return validation;
         const {
             creatorId: normalizedCreatorId,
             opponentId: normalizedOpponentId,
+            gameId: normalizedGameId,
             creator,
         } = validation.value;
 
         try {
-            const game = await sequelize.transaction(async (transaction) => {
-                const created = await gameRepository.create({
-                    creatorId: normalizedCreatorId, state: 'pending', currentPlayerId: null,
-                }, { transaction });
+            await sequelize.transaction(async (transaction) => {
                 await gamePlayerRepository.create({
-                    gameId: created.id, userId: normalizedCreatorId, piece: 'R', turnOrder: 0,
-                    invitationStatus: 'accepted',
-                }, { transaction });
-                await gamePlayerRepository.create({
-                    gameId: created.id, userId: normalizedOpponentId, piece: 'Y', turnOrder: 1,
+                    gameId: normalizedGameId, userId: normalizedOpponentId, piece: 'Y', turnOrder: 1,
                     invitationStatus: 'invited',
                 }, { transaction });
                 await invitationRepository.create({
-                    gameId: created.id, senderId: normalizedCreatorId, recipientId: normalizedOpponentId, status: 'pending',
+                    gameId: normalizedGameId, senderId: normalizedCreatorId, recipientId: normalizedOpponentId, status: 'pending',
                 }, { transaction });
-                return created;
             });
             return validation.map(() => ({
-                gameId: game.id,
+                gameId: normalizedGameId,
                 opponentId: normalizedOpponentId,
                 creator: { id: creator.id, username: creator.username },
             }));
@@ -131,13 +124,12 @@ export const createGameService = ({
             const updatedInvitation = await invitationRepository.respond(invitation.id, userId, status, transaction);
             if (!updatedInvitation) return { error: { statusCode: 409, message: 'Invitation has already been answered' } };
             
-            await gamePlayerRepository.updateInvitationStatus(gameId, userId, status, transaction);
-
-            const changes = accept
-                ? { state: 'in_progress', currentPlayerId: game.creatorId }
-                : { state: 'rejected', finishReason: 'rejected', finishedAt: new Date(), currentPlayerId: null };
-            
-            await gameRepository.update(gameId, changes, { transaction });
+            if (accept) {
+                await gamePlayerRepository.updateInvitationStatus(gameId, userId, status, transaction);
+            } else {
+                // Preserve the rejected invitation, but free the second-player slot.
+                await gamePlayerRepository.delete(participant.id, transaction);
+            }
 
             return {
                 message: accept ? 'Invitation accepted successfully' : 'Invitation rejected',
@@ -150,6 +142,17 @@ export const createGameService = ({
         return Result.Err({ statusCode: 409, message: 'Could not respond to invitation' });
     }
 };
+
+    const startGame = async (data) => {
+        const result = await gameRules.validateStartGame(data);
+        if (result.isErr()) return result;
+
+        const { gameId, game, players } = result.value;
+        const updated = await gameRepository.update(gameId, {
+            state: 'in_progress', currentPlayerId: game.creatorId,
+        });
+        return result.map(() => helpers.toGameState(updated, players));
+    };
 
     const makeMove = async (data) => {
         const result = await gameRules.validateMakeMove(data);
@@ -213,7 +216,7 @@ export const createGameService = ({
     };
 
     return {
-        createGame, createInvitation, respondInvitation, makeMove, leaveGame,
+        createGame, createInvitation, respondInvitation, startGame, makeMove, leaveGame,
         getAllGames, getGameById, getGameForPlayer, deleteGame, updateGame,
     };
 };

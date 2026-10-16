@@ -19,12 +19,15 @@ const post = (path, user, body = {}) => request(app).post('/api/games' + path).s
     ...body,
 });
 const start = async () => {
-    const created = await post('/invitations', red, { opponent_id: yellow.id });
+    const created = await post('', red);
     expect(created.status).toBe(201);
-    const game_id = created.body.gameId;
+    const game_id = created.body.game_id;
+    expect((await post('/invitations', red, { game_id, opponent_id: yellow.id })).status).toBe(201);
     const accepted = await post('/invitations/respond', yellow, { game_id, accept: true });
     expect(accepted.status).toBe(201);
     expect(accepted.body).toEqual({ message: 'Invitation accepted successfully', status: 'ACCEPTED' });
+    expect((await post('/by-id', red, { game_id })).body.state).toBe('pending');
+    expect((await post('/start', red, { game_id })).status).toBe(200);
     return game_id;
 };
 
@@ -36,7 +39,7 @@ beforeEach(async () => {
 });
 afterAll(() => sequelize.close());
 
-test.each(['', '/all', '/by-id', '/update', '/delete', '/invitations', '/invitations/respond', '/make-move', '/leave'])(
+test.each(['', '/all', '/by-id', '/update', '/delete', '/invitations', '/invitations/respond', '/start', '/make-move', '/leave'])(
     'POST /api/games%s requires authentication', async (path) => {
         const response = await request(app).post('/api/games' + path).send({});
         expect(response.status).toBe(401);
@@ -92,13 +95,17 @@ test('rejects invalid moves without advancing play and lets either player abando
     expect(ended.body).toMatchObject({ state: 'finished', winnerId: red.id, finishReason: 'abandoned' });
 });
 
-test('a standalone pending game blocks invitations until its creator deletes it', async () => {
+test('a pending game blocks duplicate creation but allows inviting into the same game', async () => {
     const created = await post('', red);
     expect(created.status).toBe(201);
     expect(created.body.message).toBe('Game created successfully');
     const { game_id } = created.body;
     expect((await post('/make-move', red, { game_id, column: 0 })).status).toBe(409);
-    expect((await post('/invitations', red, { opponent_id: yellow.id })).status).toBe(409);
+    expect((await post('', red)).status).toBe(409);
+    expect((await post('/invitations', red, { opponent_id: yellow.id })).status).toBe(400);
+    expect((await post('/invitations', red, { game_id, opponent_id: yellow.id })).status).toBe(201);
+    expect(await Game.count()).toBe(1);
+    expect((await post('', yellow)).status).toBe(409);
     expect((await post('/delete', yellow, { game_id })).status).toBe(403);
     expect((await post('/delete', red, { game_id })).status).toBe(200);
     expect(await Game.findByPk(game_id)).toBeNull();
@@ -107,8 +114,9 @@ test('a standalone pending game blocks invitations until its creator deletes it'
 });
 
 test('rejects invitations, lists games, applies creator administration and cascades deletion', async () => {
-    const created = await post('/invitations', red, { opponent_id: yellow.id });
-    const game_id = created.body.gameId;
+    const created = await post('', red);
+    const game_id = created.body.game_id;
+    expect((await post('/invitations', red, { game_id, opponent_id: yellow.id })).status).toBe(201);
     expect((await post('/invitations/respond', outsider, { game_id, accept: true })).status).toBe(404);
     expect((await post('/invitations/respond', yellow, { game_id, accept: 'true' })).status).toBe(400);
     const rejected = await post('/invitations/respond', yellow, { game_id, accept: false });
@@ -116,8 +124,10 @@ test('rejects invitations, lists games, applies creator administration and casca
     expect(rejected.body.status).toBe('REJECTED');
     const listed = await post('/all', red);
     expect(listed.status).toBe(200);
-    expect(listed.body).toEqual([expect.objectContaining({ gameId: game_id, state: 'rejected' })]);
-    const activeId = await start();
+    expect(listed.body).toEqual([expect.objectContaining({ gameId: game_id, state: 'pending' })]);
+    expect((await post('/invitations', red, { game_id, opponent_id: outsider.id })).status).toBe(201);
+    expect((await post('/invitations/respond', outsider, { game_id, accept: true })).status).toBe(201);
+    const activeId = game_id;
     const updates = { state: 'finished', currentPlayerId: null, winnerId: red.id, finishReason: 'abandoned' };
     expect((await post('/update', yellow, { game_id: activeId, updates })).status).toBe(403);
     expect((await post('/update', red, { game_id: activeId, updates })).status).toBe(200);

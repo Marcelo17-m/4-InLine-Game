@@ -43,12 +43,16 @@ const open = async (user) => {
     return client;
 };
 const start = async (a, b) => {
+    const { game_id } = await command(a, 'game:create');
     const invited = waitEvent(b, 'game:invitation');
-    const invitation = await command(a, 'game:invite', { opponent_id: users[1].id });
+    const invitation = await command(a, 'game:invite', { game_id, opponent_id: users[1].id });
     expect(await invited).toEqual(invitation);
-    const states = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
+    const lobbyStates = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
     expect(await command(b, 'game:invitation:respond', { game_id: invitation.gameId, accept: true }))
         .toEqual({ message: 'Invitation accepted successfully', status: 'ACCEPTED' });
+    for (const state of await lobbyStates) expect(state.state).toBe('pending');
+    const states = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
+    await command(a, 'game:start', { game_id });
     const [first, second] = await states;
     expect(first).toEqual(second);
     expect(first).toMatchObject({ state: 'in_progress', currentPlayerId: users[0].id });
@@ -113,14 +117,21 @@ test('notifies both players of abandonment regardless of whose turn it is', asyn
     expect(io.sockets.adapter.rooms.has('game-' + game_id)).toBe(false);
 });
 
-test('rejection notifies the creator and clears the game room', async () => {
+test('rejection keeps the creator in the waiting room and removes the recipient', async () => {
     const a = await open(users[0]);
     const b = await open(users[1]);
-    const invitation = await command(a, 'game:invite', { opponentId: users[1].id });
+    const { game_id } = await command(a, 'game:create');
+    const invitation = await command(a, 'game:invite', { gameId: game_id, opponentId: users[1].id });
     const rejected = waitEvent(a, 'game:invitation:rejected');
     await command(b, 'game:invitation:respond', { gameId: invitation.gameId, accept: false });
     expect(await rejected).toMatchObject({ gameId: invitation.gameId, status: 'REJECTED' });
-    expect(io.sockets.adapter.rooms.has('game-' + invitation.gameId)).toBe(false);
+    expect(io.sockets.adapter.rooms.get('game-' + invitation.gameId)).toEqual(new Set([a.id]));
+    expect((await Game.findByPk(game_id)).state).toBe('pending');
+    await expect(command(b, 'game:join', { game_id })).rejects.toMatchObject({ message: 'You are not part of this game' });
+    const c = await open(users[2]);
+    await command(a, 'game:invite', { game_id, opponent_id: users[2].id });
+    await command(c, 'game:invitation:respond', { game_id, accept: true });
+    expect(io.sockets.adapter.rooms.get('game-' + game_id)).toEqual(new Set([a.id, c.id]));
     await expect(command(b, 'game:invitation:respond', { game_id: invitation.gameId, accept: true }))
         .rejects.toMatchObject({ message: 'Pending invitation not found for this user' });
 });
@@ -159,13 +170,18 @@ test('a disconnected player can rejoin and recover the board without abandoning'
 test('HTTP invitation, acceptance, move, update and deletion notify socket clients', async () => {
     const a = await open(users[0]);
     const b = await open(users[1]);
+    const waiting = await post('', users[0]);
+    const game_id = waiting.body.game_id;
     const invited = waitEvent(b, 'game:invitation');
-    const created = await post('/invitations', users[0], { opponent_id: users[1].id });
+    const created = await post('/invitations', users[0], { game_id, opponent_id: users[1].id });
     expect(created.status).toBe(201);
     expect(await invited).toEqual(created.body);
-    const game_id = created.body.gameId;
+    expect(created.body.gameId).toBe(game_id);
     let states = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
     expect((await post('/invitations/respond', users[1], { game_id, accept: true })).status).toBe(201);
+    for (const state of await states) expect(state.state).toBe('pending');
+    states = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
+    expect((await post('/start', users[0], { game_id })).status).toBe(200);
     for (const state of await states) expect(state.state).toBe('in_progress');
     states = Promise.all([waitEvent(a, 'game:state'), waitEvent(b, 'game:state')]);
     const moved = await post('/make-move', users[0], { game_id, column: 2 });
@@ -224,7 +240,8 @@ test.each(['expired', 'revoked'])('rechecks a %s token after connecting', async 
 
 test('inviting an offline player follows HTTP rules and the recipient can respond later', async () => {
     const a = await open(users[0]);
-    const invitation = await command(a, 'game:invite', { opponent_id: users[1].id });
+    const { game_id } = await command(a, 'game:create');
+    const invitation = await command(a, 'game:invite', { game_id, opponent_id: users[1].id });
     const b = await open(users[1]);
     expect((await command(b, 'game:join', { game_id: invitation.gameId })).state).toBe('pending');
     expect((await command(b, 'game:invitation:respond', { game_id: invitation.gameId, accept: true })).status).toBe('ACCEPTED');

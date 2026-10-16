@@ -1,6 +1,6 @@
 import Result from '../Monads/result.js';
 
-export const createGameValidator = ({ gameRepository, gamePlayerRepository, userRepository, helpers }) => {
+export const createGameValidator = ({ gameRepository, gamePlayerRepository, invitationRepository, userRepository, helpers }) => {
     const validateAuthenticatedUser = async (data) => {
         const userId = Number(data.userId);
         if (!['number', 'string'].includes(typeof data.userId) || !Number.isSafeInteger(userId) || userId <= 0) {
@@ -15,6 +15,14 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
             return Result.Err({ statusCode: 404, message: 'Creator not found' });
         }
         return Result.Ok({ ...data, creator });
+    };
+
+    const validateUserAvailable = async (data) => {
+        const games = await gamePlayerRepository.findActiveGamesByUserId(data.userId);
+        if (games.length) {
+            return Result.Err({ statusCode: 409, message: 'You already have a pending or active game' });
+        }
+        return Result.Ok(data);
     };
 
     const validateGameIdProvided = async (data) => {
@@ -59,6 +67,20 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
     const validateGameInProgress = async (data) => {
         if (data.game.state !== 'in_progress') {
             return Result.Err({ statusCode: 409, message: 'The game is not in progress' });
+        }
+        return Result.Ok(data);
+    };
+
+    const validateGamePending = async (data) => {
+        if (data.game.state !== 'pending') {
+            return Result.Err({ statusCode: 409, message: 'Only a pending game can be started' });
+        }
+        return Result.Ok(data);
+    };
+
+    const validateStartCreator = async (data) => {
+        if (Number(data.game.creatorId) !== data.userId) {
+            return Result.Err({ statusCode: 403, message: 'Only the creator can start this game' });
         }
         return Result.Ok(data);
     };
@@ -174,26 +196,56 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
     const validateCreateInvitationInput = async (data) => {
         const creatorId = Number(data.creatorId);
         const opponentId = Number(data.opponentId);
-        if (!Number.isSafeInteger(creatorId) || creatorId <= 0 || !Number.isSafeInteger(opponentId) || opponentId <= 0) {
+        if (!['number', 'string'].includes(typeof data.creatorId) ||
+            !['number', 'string'].includes(typeof data.opponentId) ||
+            !Number.isSafeInteger(creatorId) || creatorId <= 0 || !Number.isSafeInteger(opponentId) || opponentId <= 0) {
             return Result.Err({ statusCode: 400, message: 'creatorId and opponentId must be positive integers' });
         }
         if (creatorId === opponentId) {
             return Result.Err({ statusCode: 400, message: 'You cannot invite yourself' });
         }
-        const [creator, opponent] = await Promise.all([
-            userRepository.findById(creatorId),
-            userRepository.findById(opponentId),
-        ]);
-        if (!creator) return Result.Err({ statusCode: 404, message: 'Creator not found' });
+        return Result.Ok({ ...data, creatorId, userId: creatorId, opponentId });
+    };
+
+    const validateInvitationGame = async (data) => {
+        if (Number(data.game.creatorId) !== data.creatorId) {
+            return Result.Err({ statusCode: 403, message: 'Only the creator can invite players to this game' });
+        }
+        if (data.game.state !== 'pending') {
+            return Result.Err({ statusCode: 409, message: 'Invitations require a pending game' });
+        }
+        return Result.Ok(data);
+    };
+
+    const validateInvitationSlotAvailable = async (data) => {
+        if (data.players.length !== 1 || data.gamePlayer.piece !== 'R' || data.gamePlayer.turnOrder !== 0) {
+            return Result.Err({ statusCode: 409, message: 'This game already has an opponent or a pending invitation' });
+        }
+        const invitations = await invitationRepository.findByGameId(data.gameId);
+        if (invitations.some((invitation) => invitation.status === 'pending')) {
+            return Result.Err({ statusCode: 409, message: 'This game already has a pending invitation' });
+        }
+        // The current model stores one invitation per game and recipient.
+        if (invitations.some((invitation) => Number(invitation.recipientId) === data.opponentId)) {
+            return Result.Err({ statusCode: 409, message: 'This player has already been invited to this game; invite another player' });
+        }
+        return Result.Ok(data);
+    };
+
+    const validateInvitationPlayersAvailable = async (data) => {
+        const opponent = await userRepository.findById(data.opponentId);
         if (!opponent) return Result.Err({ statusCode: 404, message: 'Opponent not found' });
         const [creatorGames, opponentGames] = await Promise.all([
-            gamePlayerRepository.findActiveGamesByUserId(creatorId),
-            gamePlayerRepository.findActiveGamesByUserId(opponentId),
+            gamePlayerRepository.findActiveGamesByUserId(data.creatorId),
+            gamePlayerRepository.findActiveGamesByUserId(data.opponentId),
         ]);
-        if (creatorGames.length || opponentGames.length) {
-            return Result.Err({ statusCode: 409, message: 'Both players must be available to start a game' });
+        if (creatorGames.some((player) => Number(player.gameId) !== data.gameId)) {
+            return Result.Err({ statusCode: 409, message: 'You already belong to another pending or active game' });
         }
-        return Result.Ok({ ...data, creatorId, opponentId, creator, opponent });
+        if (opponentGames.length) {
+            return Result.Err({ statusCode: 409, message: 'The opponent already has a pending or active game' });
+        }
+        return Result.Ok({ ...data, opponent });
     };
 
     const validateRespondInvitationInput = async (data) => {
@@ -209,10 +261,12 @@ export const createGameValidator = ({ gameRepository, gamePlayerRepository, user
     };
 
     return {
-        validateAuthenticatedUser, validateCreatorExists, validateGameIdProvided, validateColumn,
+        validateAuthenticatedUser, validateCreatorExists, validateUserAvailable, validateGameIdProvided, validateColumn,
         validateGameExistsByGameId, validateUserIsInGame, validateAcceptedPlayer,
-        validateGameInProgress, validateTwoPlayers, validateIsPlayerTurn, validateColumnHasSpace,
+        validateGameInProgress, validateGamePending, validateStartCreator,
+        validateTwoPlayers, validateIsPlayerTurn, validateColumnHasSpace,
         validateCreateInvitationInput, validateRespondInvitationInput,
+        validateInvitationGame, validateInvitationSlotAvailable, validateInvitationPlayersAvailable,
         validateGameCreator, validateUpdateFields, validateUpdatedBoard, validateUpdatedGameState,
     };
 };
