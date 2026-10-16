@@ -22,6 +22,10 @@ export function startGame(gameId) {
   return sendSocketEvent('game:start', { game_id: gameId });
 }
 
+export function makeMove(gameId, column) {
+  return sendSocketEvent('game:move', { game_id: gameId, column }, { requireConnected: true });
+}
+
 // Room membership is checked by the backend before an invitation is accepted.
 export async function joinGame(gameId) {
   const data = { game_id: gameId };
