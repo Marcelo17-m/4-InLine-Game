@@ -2,17 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import TableLayout from '../TableLayout/TableLayout.jsx';
 import GameLogo from '../GameLogo/GameLogo.jsx';
 import styles from './GameLobby.module.css';
-import { initSocket } from '../../api/socket.js';
+import { useGameConnection } from '../../hooks/useGameConnection.js';
 import { getCurrentUser } from '../../api/session.js';
-import { getGameForPlayer, invitePlayer, startGame } from '../../api/gameApi.js';
+import { invitePlayer, startGame } from '../../api/gameApi.js';
 
-function GameLobby({ gameId, initialGameState = null, created = false, onBack }) {
-  const [game, setGame] = useState(initialGameState);
+function GameLobby({ gameId, initialGameState = null, created, onBack, onGameStarted }) {
+  const { game, setGame, connected, error, setError, refresh } = useGameConnection(gameId, initialGameState);
   const [opponentId, setOpponentId] = useState('');
   const [pending, setPending] = useState(null);
-  const [connected, setConnected] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState(created ? 'Partida creada correctamente.' : 'Te uniste a la partida correctamente.');
+  const [notice, setNotice] = useState(created === undefined ? '' : created ? 'Partida creada correctamente.' : 'Te uniste a la partida correctamente.');
   const busy = useRef(false);
   const userId = getCurrentUser()?.sub;
   const players = game?.players ?? [];
@@ -23,50 +21,8 @@ function GameLobby({ gameId, initialGameState = null, created = false, onBack })
   const canInvite = waiting && isCreator && players.length === 1 && connected;
 
   useEffect(() => {
-    const socket = initSocket();
-    let active = true;
-    const receiveState = (state) => {
-      if (!active || String(state.gameId) !== String(gameId)) return;
-      setGame(state);
-    };
-    const refresh = async () => {
-      setConnected(false);
-      try {
-        const state = await getGameForPlayer(gameId);
-        if (!active) return;
-        receiveState(state);
-        setConnected(true);
-        setError('');
-      } catch (err) {
-        if (active) setError(err.message);
-      }
-    };
-    const disconnected = () => {
-      setConnected(false);
-      setError('Se perdió la conexión. Reconectando…');
-    };
-    const connectionError = (err) => { setConnected(false); setError(err.message); };
-    const deleted = (data) => {
-      if (String(data.game_id) !== String(gameId)) return;
-      setGame((current) => current ? { ...current, state: 'deleted' } : null);
-      setError('Esta partida fue eliminada. Vuelve al menú.');
-    };
-    socket.on('game:state', receiveState);
-    socket.on('game:deleted', deleted);
-    socket.on('connect', refresh);
-    socket.on('disconnect', disconnected);
-    socket.on('connect_error', connectionError);
-    if (socket.connected) refresh();
-    else socket.connect();
-    return () => {
-      active = false;
-      socket.off('game:state', receiveState);
-      socket.off('game:deleted', deleted);
-      socket.off('connect', refresh);
-      socket.off('disconnect', disconnected);
-      socket.off('connect_error', connectionError);
-    };
-  }, [gameId]);
+    if (game && ['in_progress', 'finished'].includes(game.state)) onGameStarted(game);
+  }, [game, onGameStarted]);
 
   const runAction = async (action, callback) => {
     if (busy.current) return;
@@ -142,6 +98,7 @@ function GameLobby({ gameId, initialGameState = null, created = false, onBack })
       </form>}
 
       {error && <p className={styles.error} role="alert">{error}</p>}
+      {!connected && <button type="button" className={styles.back} onClick={refresh}>Reintentar conexión</button>}
       <div className={styles.actions}>
         {waiting && (isCreator ? <>
           <button type="button" className={styles.start} disabled={!canStart || Boolean(pending)} onClick={handleStart}>
