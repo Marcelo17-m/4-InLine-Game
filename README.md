@@ -1,336 +1,358 @@
-# 4 In Line Game - Migration In Progress
+# Cuatro en Línea — Capstone de Redes 2
 
-This branch starts the migration from UNO to a two-player online 4 In Line game. It removes the card and score domains, adapts the core models, and keeps the existing networking infrastructure for the next implementation step.
+**Autor:** Marcelo Medrano Fonseca
 
-See [CONNECT_FOUR_MIGRATION.md](CONNECT_FOUR_MIGRATION.md) for the completed scope, database decision, known limitations, and the exact plan to replace `GameService`.
+Juego multijugador para dos usuarios, con interfaz React, API HTTP y comunicación en tiempo real mediante Socket.IO. El servidor valida las jugadas, calcula turnos y resultados, guarda el estado en MySQL y lo distribuye a los participantes.
 
-The remaining content below documents the legacy UNO implementation and is retained only as migration reference until the 4 In Line backend is complete.
+## Funcionalidades actuales
 
-# Legacy UNO Game - Full-Stack Capstone
+- Registro y login con JWT; contraseñas protegidas mediante bcrypt y correo opcional en el backend.
+- Menú para crear una partida o entrar por su ID con una invitación existente.
+- Lobby con ID de partida, nombres e IDs de jugadores, creador y estado de invitación.
+- Invitaciones por ID de usuario y notificación en tiempo real al destinatario conectado en el menú.
+- Inicio manual por el creador cuando ambos jugadores han aceptado. Aceptar una invitación no inicia la partida.
+- Tablero de 6 filas y 7 columnas dibujado con React y CSS, con fichas rojas y amarillas.
+- Selección de columna al pulsar un círculo vacío, resaltado verde y colocación en la fila libre más baja.
+- Turnos sincronizados, detección de cuatro en línea horizontal, vertical y diagonal, y empate por tablero lleno.
+- Ventana de resultado con ganador o empate y regreso al menú de crear/unirse.
+- Reconexión y recuperación del tablero guardado; restauración de la partida al recargar la misma pestaña mientras el JWT sea válido.
+- API para consultar, administrar y abandonar partidas, además de estadísticas de solicitudes HTTP.
 
-**Author:** Marcelo Medrano Fonseca
+La interfaz actual no incluye pantallas de perfil, administración ni un botón de abandono. Esas operaciones se pueden utilizar mediante la API cuando corresponda. Los componentes de cartas y tablero de UNO ya fueron eliminados.
 
-A multiplayer UNO application with a Node.js API, a React interface, and real time gameplay through Socket.IO. The backend manages all game rules and database changes and the frontend renders the state that the server sends to each player.
+## Tecnologías y arquitectura
 
-## Main features
-
-- User registration, login, logout, profile, and authenticated account deletion.
-- Game creation through REST.
-- Real-time join, start, leave, play, draw, say UNO, and catch UNO actions.
-- Private state updates: each player receives their own hand, but only the card count and user ID of opponents.
-- Complete UNO turn logic for number, skip, reverse, draw two, wild, and wild draw four cards.
-- Wild-card color selection, with the selected color displayed on the discard pile.
-- Automatic discard-pile recycling when the draw deck runs out.
-- Winner notification and a final score table when a player reaches zero cards.
-- A REST endpoint that suggests a playable card for the authenticated player.
-- Request statistics, short-lived response caching, history, and score persistence.
-- Backend tests for helpers, monads, validators, services, repositories, controllers, and socket handlers.
-
-## Recent improvements
-
-- Gameplay actions in the React app were moved from repeated HTTP requests to Socket.IO events.
-- Drawing a card now updates the database and broadcasts a fresh personalized `game-state`, so the new card appears immediately.
-- Joining and leaving a game now use sockets in the UI.
-- A `game-ended` event opens a winner modal with every player's final score.
-- Wild cards preserve and display the chosen active color.
-- The card parser and sprite mapping support regular cards, black wild cards, and colored wild-card states.
-- The missing green UI color tokens were added.
-- `DELETE /api/auth/users/:id` was added for authenticated self-deletion.
-- `POST /api/games/suggest-card` was added to return a legal card or `null`.
-
-## Technology
-
-| Area | Technology |
+| Área | Tecnología |
 | --- | --- |
-| Backend | Node.js, Express 5 |
-| Real-time communication | Socket.IO |
-| Database | MySQL, Sequelize |
-| Authentication | JWT, bcrypt |
-| Frontend | React 18, Vite, CSS Modules |
-| Backend tests | Jest, Supertest, SQLite in memory |
-| Logging | Winston |
+| Backend | Node.js, Express 5, JavaScript |
+| Tiempo real | Socket.IO 4 |
+| Persistencia | MySQL, Sequelize 6, mysql2 |
+| Autenticación | JWT, bcrypt |
+| Frontend | React 18, Vite 5, CSS Modules |
+| Pruebas | Jest, Supertest, cliente Socket.IO y SQLite en memoria |
+| Registro de errores | Winston |
 
-## Architecture
-
-The backend follows a layered architecture. Dependencies are assembled in `src/container.js`, which lets the business logic receive repositories and helper functions instead of creating them directly.
-
-```text
-React component
-    | REST request                  | Socket event
-    v                               v
-Express route -> Controller      Socket handler
-                    \              /
-                     v            v
-                       Service
-                          |
-                    Validator rules
-                          |
-                      Repository
-                          |
-                  Sequelize model -> MySQL
+```mermaid
+flowchart LR
+    A["Jugador A · React"] <--> V["Vite · archivos y proxy"]
+    B["Jugador B · React"] <--> V
+    V <-->|"/api y /socket.io"| P["Express + Socket.IO"]
+    P <--> S["Servicios"]
+    S --> R["ValidatorRules → Validator"]
+    R --> D["Repositorios"]
+    S <--> D
+    D <--> M["Sequelize → MySQL"]
+    S --> E["Resultado → gameEvents"]
+    E --> P
 ```
 
-After a socket action changes the game, the server asks `GameService` for a separate view for every connected user and emits `game-state`. This prevents one player from receiving another player's cards.
+Este diagrama representa el entorno de desarrollo. React se ejecuta en los navegadores; Vite sirve sus archivos y actúa como proxy. Los jugadores se comunican con el servidor, no directamente entre sí.
 
-### Project structure
+Las dependencias se ensamblan en [src/container.js](src/container.js). Los controladores HTTP y manejadores de sockets llaman a los mismos servicios. Cada servicio utiliza sus reglas compuestas, estas ejecutan los validadores, y los repositorios realizan las operaciones de persistencia. Los errores de validación usan `Result.Err({ statusCode, message })`.
+
+[gameEvents.js](src/Presentation/Sockets/gameEvents.js) publica los estados después de acciones exitosas, tanto HTTP como Socket.IO. Los dos jugadores reciben el tablero público completo; no existen manos privadas ni puntuaciones de cartas.
+
+### Estructura
 
 ```text
-.
-|-- src/
-|   |-- Data Access/
-|   |   |-- Models/          # Sequelize tables and associations
-|   |   `-- Repositories/    # Database queries
-|   |-- Logic/
-|   |   |-- Monads/          # Result.Ok / Result.Err
-|   |   |-- Services/        # Application and UNO business logic
-|   |   `-- Validators/      # Small rules and composed validation flows
-|   |-- Presentation/
-|   |   |-- Controllers/     # HTTP adapters
-|   |   |-- Routes/          # Express endpoints
-|   |   `-- Sockets/         # Socket.IO event handlers and connections
-|   |-- Middleware/          # JWT, errors, metrics, caching, socket auth
-|   |-- Helpers/             # Card rules, deck, recursion, scoring, composition
-|   |-- Tests/               # Backend automated tests
-|   |-- app.js               # Express application
-|   |-- container.js         # Dependency composition root
-|   `-- server.js            # HTTP + Socket.IO server
-`-- uno-frontend/
-    |-- src/
-    |   |-- api/             # fetch client, JWT session, Socket.IO client
-    |   |-- components/      # React screens and reusable UI
-    |   |-- data/            # Card sprite coordinates
-    |   |-- utils/           # Backend-card to sprite-ID parser
-    |   `-- App.jsx          # Screen and active-game coordinator
-    `-- vite.config.js       # /api and /socket.io development proxies
+src/
+  Data Access/
+    Models/                  # User, Game, GamePlayer, Invitation, History, ApiStats
+    Repositories/            # Consultas a la base de datos
+    connectFourSchema.js     # Forma y valores del tablero persistido
+    database.js              # Configuración de Sequelize
+  Logic/
+    Monads/                  # Result.Ok / Result.Err
+    Services/                # Autenticación, partidas y estadísticas
+    Validators/              # Validaciones y su composición
+  Presentation/
+    Controllers/             # Adaptadores HTTP
+    Routes/                  # Rutas de Express
+    Sockets/                 # Eventos, salas y publicación de estados
+  Middleware/                # Autenticación, errores y métricas
+  Helpers/                   # Reglas de Cuatro en Línea y utilidades
+  Tests/                     # Pruebas del backend
+  app.js                     # Aplicación Express
+  container.js               # Inyección de dependencias
+  server.js                  # Arranque de HTTP, Socket.IO y base de datos
+4Inline-frontend/
+  src/
+    api/                     # HTTP, sockets y recuperación de partidas
+    hooks/                   # useGameConnection
+    components/              # Login, registro, menú, lobby y tablero
+    Tests/                   # Pruebas de conexión, movimientos y recuperación
+    App.jsx                  # Navegación y partida activa
+  vite.config.js             # Proxy de desarrollo
 ```
 
-## REST and Socket.IO responsibilities
+## Instalación y ejecución local
 
-The React frontend intentionally uses both protocols:
+Se necesita Node.js 20 o superior, npm y una instancia MySQL accesible. La dependencia de desarrollo `cross-env` requiere Node.js >=20.
 
-| Action | Frontend transport | Reason |
-| --- | --- | --- |
-| Register and login | REST | One request produces one response |
-| Create game | REST | Creation is a one-time command |
-| Join and start | Socket.IO | Every lobby member must update immediately |
-| Play, draw, say/catch UNO | Socket.IO | Every player needs the new state immediately |
-| Leave game | Socket.IO | The room and game state must update together |
-| Receive winner and scores | Socket.IO | The server pushes the result to the whole room |
+### Backend
 
-The backend keeps REST versions of several game actions for API/Postman use. The React gameplay screens use the socket versions.
-
-## Installation
-
-### Requirements
-
-- Node.js 18 or newer
-- npm
-- A running MySQL server
-
-### 1. Configure the backend
-
-Install dependencies from the project root:
+Desde la raíz del repositorio:
 
 ```bash
 npm install
 ```
 
-Copy `.env.example` to `.env` and enter your database values:
+Copia `.env.example` a `.env` y completa los valores. En PowerShell puedes usar `Copy-Item .env.example .env` si todavía no tienes un `.env`.
+
+Ejemplo para usar el proxy del frontend sin modificarlo:
 
 ```env
-DB_PORT=3306
-DB_NAME=game_db
-DB_USER=root
-DB_PASSWORD=your_password
-DB_HOST=127.0.0.1
-DB_DIALECT=mysql
-JWT_SECRET=replace_with_a_long_random_secret
-JWT_EXPIRES_IN=1h
+HOST=127.0.0.1
 PORT=3000
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=connect4_db
+DB_USER=tu_usuario
+DB_PASSWORD=tu_password
+DB_DIALECT=mysql
+JWT_SECRET=reemplaza_este_valor_por_un_secreto_largo_y_aleatorio
+JWT_EXPIRES_IN=1h
 ```
 
-Start the API and Socket.IO server:
+**Alineación de puertos:** `.env.example` actualmente propone `PORT=3100`, pero los dos destinos de [vite.config.js](4Inline-frontend/vite.config.js) apuntan a `http://localhost:3000`. Usa `PORT=3000` en tu `.env`, o cambia ambos destinos del proxy al puerto elegido. Postman debe utilizar ese mismo puerto del backend.
+
+Crea previamente la base de datos indicada por `DB_NAME`, por ejemplo:
+
+```sql
+CREATE DATABASE connect4_db;
+```
+
+Después ejecuta:
 
 ```bash
 npm run dev
 ```
 
-The backend listens on `http://localhost:3000` by default. On startup, Sequelize authenticates and synchronizes the models.
+[server.js](src/server.js) autentica la conexión a MySQL y ejecuta `sequelize.sync({ alter: true })` antes de escuchar conexiones. Esto sincroniza las tablas y puede modificar su estructura; no crea la base de datos MySQL. El flujo actual no utiliza migraciones.
 
-### 2. Configure the frontend
+### Frontend
 
-In a second terminal:
+En otra terminal:
 
 ```bash
-cd uno-frontend
+cd 4Inline-frontend
 npm install
 npm run dev
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. During development, Vite proxies `/api` and `/socket.io` to port `3000`.
+Abre la dirección que indique Vite, normalmente `http://localhost:5173`. Para simular dos usuarios, utiliza sesiones de navegador independientes, por ejemplo una ventana normal y una privada: las pestañas de un mismo perfil comparten el JWT guardado en `localStorage`.
 
-## Authentication
+### Puertos y conexiones
 
-For authenticated REST requests with a JSON body, pass the JWT in the `access_token` field. This also works for `DELETE /api/auth/users/:id` and `DELETE /api/games/:id`; the middleware reads the token from the request body.
-
-```json
-{
-  "access_token": "YOUR_JWT"
-}
-```
-
-Socket.IO sends the same JWT once during its handshake.
-
-The server verifies the token before accepting the socket and stores the decoded user as `socket.user`.
-
-## REST API
-
-All routes start with `/api`.
-
-### Authentication: `/api/auth`
-
-| Method | Path | Description |
-| --- | --- | --- |
-| POST | `/register` | Create a user |
-| POST | `/login` | Return a JWT |
-| POST | `/logout` | Revoke the current JWT |
-| POST | `/profile` | Return the authenticated profile |
-| DELETE | `/users/:id` | Delete your own account and revoke the JWT |
-
-Example account deletion:
-
-```http
-DELETE /api/auth/users/5
-Content-Type: application/json
-
-{
-  "access_token": "YOUR_JWT"
-}
-```
-
-The user ID inside the token must match `:id`; otherwise the API returns `403`. A successful deletion returns `204 No Content`: the request contains the token, and the response has no body.
-
-### Games: `/api/games`
-
-| Method | Path | Description |
-| --- | --- | --- |
-| POST | `/` | Create a game |
-| GET | `/` | List games |
-| GET | `/:id` | Get one game |
-| PUT | `/:id` | Update a game |
-| DELETE | `/:id` | Delete a game |
-| POST | `/join` | Join a waiting game |
-| POST | `/start` | Start a game |
-| POST | `/leave` | Leave a game |
-| POST | `/end` | End a game manually |
-| POST | `/state` | Get the basic state |
-| POST | `/players` | Get players |
-| POST | `/current-player` | Get the current player |
-| POST | `/top-card` | Get the discard card |
-| POST | `/scores` | Get scores |
-| POST | `/play-card` | Play a card |
-| POST | `/draw-card` | Draw a card |
-| POST | `/say-uno` | Declare UNO |
-| POST | `/catch-uno` | Penalize a player who did not say UNO |
-| POST | `/hand` | Get the authenticated player's hand |
-| POST | `/history` | Get turn history |
-| POST | `/state-detail` | Get a player-specific full state |
-| POST | `/suggest-card` | Suggest a legal card for the current player |
-
-Suggestion request and response:
-
-```json
-{
-  "game_id": 5,
-  "access_token": "YOUR_JWT"
-}
-```
-
-```json
-{
-  "game_id": 5,
-  "suggested_card": "green reverse",
-  "message": "Playable card found"
-}
-```
-
-When no card can be played, `suggested_card` is `null`. The game must be in progress, the user must belong to it, and it must be that user's turn.
-
-### Cards, scores, and statistics
-
-- `/api/cards`: standard `POST`, `GET`, `GET /:id`, `PUT /:id`, and `DELETE /:id` operations.
-- `/api/scores`: standard `POST`, `GET`, `GET /:id`, `PUT /:id`, and `DELETE /:id` operations.
-- `/api/stats/requests`
-- `/api/stats/response-times`
-- `/api/stats/status-codes`
-- `/api/stats/popular-endpoints`
-
-## Socket.IO events
-
-### Client to server
-
-| Event | Important payload fields |
+| Servicio | Configuración |
 | --- | --- |
-| `join` | `game_id` |
-| `start-game` | `game_id` |
-| `play-card` | `game_id`, `card`, `chosen_color` for wild cards |
-| `draw-card` | `game_id` |
-| `say-uno` | `game_id` |
-| `catch-uno` | `game_id`, `target_user_id` |
-| `leave-game` | `game_id` |
+| Vite | 5173 por defecto; puede elegir otro si está ocupado. |
+| API HTTP y Socket.IO | Comparten el mismo `http.Server`; `PORT` o 3000 como respaldo. |
+| Dirección del backend | `HOST` o `127.0.0.1` como respaldo. |
+| MySQL | `DB_HOST` y `DB_PORT`; 3306 si no se especifica puerto. |
 
-### Server to client
+Vite redirige `/api` y `/socket.io` al backend. El cliente usa `fetch('/api/...')` e `io('/')`. Socket.IO puede comenzar con HTTP long-polling e intentar pasar a WebSocket. El backend mantiene una conexión independiente con MySQL.
 
-| Event | Purpose |
+Si MySQL está en Docker con un mapeo `3307:3306`, un backend ejecutado en el computador se conecta al puerto publicado `3307`. El puerto `3306` corresponde al interior del contenedor. Si ambos servicios están en la misma red de Docker, se utiliza normalmente el nombre del servicio MySQL y su puerto interno. Este repositorio no incluye actualmente Dockerfile ni Compose.
+
+`127.0.0.1` solo permite acceso local directo al backend. El despliegue en otra máquina o en una red requiere configurar las direcciones, el proxy y el firewall según esa topología.
+
+## Cómo jugar
+
+1. Registra dos usuarios e inicia sesión en cada navegador.
+2. El jugador A pulsa **Crear partida**. Se crea una partida `pending`, A queda aceptado como creador y se muestra el ID en el lobby.
+3. A introduce el ID de usuario de B y pulsa **Invitar**. La invitación utiliza esa misma partida.
+4. B recibe una notificación si está conectado y en el menú. Pulsa **Unirse a partida** con el ID de la partida para aceptar. También puede introducir manualmente el ID si no recibió la notificación.
+5. Con ambos aceptados, el botón de inicio del creador se habilita en verde. A pulsa **Empezar partida**; ambos pasan al tablero y A juega primero.
+6. En cada turno, pulsa un círculo vacío de la columna deseada. El servidor determina dónde cae la ficha y envía el tablero actualizado a ambos jugadores.
+7. Al ganar o empatar aparece el resultado y un botón para volver al menú.
+
+Un usuario que participa como aceptado o invitado en una partida pendiente o activa no puede crear otra. El creador solo puede invitar si queda libre el lugar del rival. Rechazar una invitación libera ese lugar y conserva la partida pendiente; el modelo no permite volver a invitar al mismo destinatario en esa misma partida, pero sí a otro usuario disponible.
+
+## Autenticación
+
+`POST /api/auth/login` recibe `username` y `password` y devuelve `{ "accessToken": "..." }`.
+
+Las solicitudes HTTP protegidas aceptan el JWT en el cuerpo JSON:
+
+```json
+{
+  "access_token": "TU_JWT",
+  "game_id": 42
+}
+```
+
+También admiten `Authorization: Bearer TU_JWT`. El backend obtiene la identidad del token; no debes enviar un `userId` para actuar como otro jugador.
+
+Socket.IO envía el token como `auth.token`. Se valida al establecer la conexión y nuevamente al manejar comandos. Un token vencido o revocado no se renueva mediante la reconexión.
+
+## API HTTP
+
+Base local del ejemplo: `http://localhost:3000/api`. Ajusta el puerto si cambiaste `PORT`. Envía los cuerpos como JSON con `Content-Type: application/json`.
+
+### Usuarios — `/api/auth`
+
+| Método | Ruta | Cuerpo / comportamiento |
+| --- | --- | --- |
+| POST | `/register` | `username`, `password`, `email` opcional. |
+| POST | `/login` | `username`, `password`; devuelve `accessToken`. |
+| POST | `/logout` | JWT; revoca el token actual. |
+| POST | `/profile` | JWT; devuelve `id` y `username`. Sirve para conocer el ID a invitar. |
+| DELETE | `/users/:id` | JWT; eliminación de la propia cuenta, respuesta exitosa 204 sin cuerpo. |
+
+### Partidas — `/api/games`
+
+Todas estas rutas requieren JWT. Las consultas y operaciones administrativas actuales utilizan **POST**, conforme a los routers existentes.
+
+| Método | Ruta | Campos adicionales al JWT | Comportamiento |
+| --- | --- | --- | --- |
+| POST | `/` | Ninguno | Crear partida; respuesta 201 con `message` y `game_id`. |
+| POST | `/all` | Ninguno | Listar partidas. |
+| POST | `/by-id` | `game_id` | Consultar estado público. |
+| POST | `/delete` | `game_id` | Eliminar; solo el creador. |
+| POST | `/update` | `game_id`, `updates` | Administración manual; solo el creador. |
+| POST | `/invitations` | `game_id`, `opponent_id` | Invitar a una partida pendiente existente; solo el creador. |
+| POST | `/invitations/respond` | `game_id`, `accept` booleano | Aceptar o rechazar la invitación propia. |
+| POST | `/start` | `game_id` | Iniciar; creador y dos jugadores aceptados. |
+| POST | `/make-move` | `game_id`, `column` entero 0–6 | Jugar en una partida activa y en el turno propio. |
+| POST | `/leave` | `game_id` | Abandonar una partida activa; gana el rival con `finishReason: abandoned`. |
+
+`updates` permite `board`, `state`, `currentPlayerId`, `winnerId` y `finishReason`, sujetos a validación de coherencia. No existe un rol de administrador separado: el permiso se basa en ser creador.
+
+`/all` y `/by-id` requieren autenticación, pero no pertenencia a la partida. En cambio, el evento `game:join` sí valida la pertenencia antes de suscribir la conexión a la sala.
+
+Los errores HTTP tienen forma `{ "error": "mensaje" }`. Los errores previstos distinguen entradas inválidas (400), autenticación (401), permisos (403), recursos inexistentes (404) y conflictos de estado (409).
+
+### Ejemplo de partida en Postman
+
+Después de obtener los JWT de A y B, ejecuta estas solicitudes en orden. Sustituye 42 por el ID devuelto al crear y 2 por el ID real de B.
+
+| Paso | URL relativa a `/api/games` | Cuerpo JSON |
+| --- | --- | --- |
+| Crear, como A | POST `/` | `{"access_token":"JWT_A"}` |
+| Invitar, como A | POST `/invitations` | `{"access_token":"JWT_A","game_id":42,"opponent_id":2}` |
+| Aceptar, como B | POST `/invitations/respond` | `{"access_token":"JWT_B","game_id":42,"accept":true}` |
+| Iniciar, como A | POST `/start` | `{"access_token":"JWT_A","game_id":42}` |
+| Jugar, como A | POST `/make-move` | `{"access_token":"JWT_A","game_id":42,"column":0}` |
+| Jugar, como B | POST `/make-move` | `{"access_token":"JWT_B","game_id":42,"column":1}` |
+
+Para comprobar una victoria vertical, alterna las columnas `0, 1, 0, 1, 0, 1, 0`, empezando por A. La última respuesta contiene `state: finished`, `winnerId`, `finishReason: four_in_line`, `message` y `winner: { userId, username, piece }`.
+
+Aceptar no basta para jugar: debes enviar `/start`. No hay una ruta HTTP `/join`; en Postman la aceptación se realiza con `/invitations/respond`.
+
+### Estadísticas — `/api/stats`
+
+Rutas GET: `/requests`, `/response-times`, `/status-codes` y `/popular-endpoints`. Registran/consultan métricas HTTP; no son estadísticas de jugadas ni mediciones de todos los eventos Socket.IO. Actualmente estas rutas no tienen middleware JWT.
+
+## Eventos Socket.IO
+
+El frontend usa HTTP para registro, login y creación; utiliza Socket.IO para invitar, aceptar, entrar a la sala, iniciar y jugar. Las versiones HTTP y socket comparten servicios.
+
+### Cliente → servidor
+
+| Evento | Datos |
 | --- | --- |
-| `join` | Refresh lobby players |
-| `start-game` | Confirm that start succeeded to the requester |
-| `play-card`, `draw-card`, `say-uno`, `catch-uno`, `leave-game` | Confirm an action to the requester |
-| `game-state` | Push a fresh personalized board after a successful change |
-| `game-ended` | Send the winner message and final scores to the room |
-| `error` | Return `{ event, message }` for a failed action |
-| `connect_error` | Report JWT handshake failures on the client |
+| `game:create` | `{}` |
+| `game:list` | `{}` |
+| `game:get` | `{ game_id }` |
+| `game:join` | `{ game_id }`; consulta estado y suscribe a un participante existente. |
+| `game:invite` | `{ game_id, opponent_id }` |
+| `game:invitation:respond` | `{ game_id, accept }` |
+| `game:start` | `{ game_id }` |
+| `game:move` | `{ game_id, column }` |
+| `game:leave` | `{ game_id }` |
+| `game:update` | `{ game_id, updates }` |
+| `game:delete` | `{ game_id }` |
 
-## Card display and wild colors
+`game:join` por sí solo no crea participantes ni acepta invitaciones. El frontend consulta la participación, envía `game:invitation:respond` si está `invited`, y vuelve a solicitar el estado.
 
-The backend sends simple strings such as `red 7`, `green draw_two`, `wild`, or `blue wild_draw_four`. `cardParser.js` converts them into sprite IDs such as `red-7`, `green-draw2`, `wild-black`, or `wild4-blue`. `Card.jsx` then uses `cardSprite.js` to select the correct row and column from `uno-cards.png`.
+### Servidor → cliente
 
-Cards in a player's hand display a wild card with its black face. After it is played, `GameService` stores `currentColor`, includes that color in the next `topCard`, and the frontend renders the colored wild sprite.
+| Evento | Contenido / propósito |
+| --- | --- |
+| Mismo nombre del comando | Resultado directo al solicitante; no se usa un callback de acknowledgement en estos manejadores. |
+| `game:state` | Estado completo y público de la partida. |
+| `game:invitation` | `gameId`, `opponentId`, `creator: { id, username }`; notificación al destinatario. |
+| `game:invitation:accepted` | Confirmación de aceptación con `gameId`, `status`, `message`. |
+| `game:invitation:rejected` | Confirmación de rechazo con `gameId`, `status`, `message`. |
+| `game:ended` | Estado final de una partida terminada. |
+| `game:deleted` | `{ message, game_id }`. |
+| `error` | `{ event, message }` para el cliente que envió el comando. |
+| `connect_error` | Error observado por el cliente al fallar la conexión/autenticación. |
 
-## Tests
+Las conexiones se agrupan en `user:<id>` para avisos a un usuario y `game-<id>` para actualizaciones de una partida. Las salas son agrupaciones de Socket.IO, no puertos adicionales. Al terminar o eliminar una partida se retiran las conexiones de su sala.
 
-Run all backend tests once:
+## Estado y persistencia
+
+| Campo público | Significado |
+| --- | --- |
+| `gameId`, `creatorId` | Identificadores de partida y creador. |
+| `state` | Flujo normal: `pending` → `in_progress` → `finished`. |
+| `board` | Matriz 6×7: `0` vacío, `1` rojo, `2` amarillo. Fila 0 arriba; fila 5 abajo. |
+| `currentPlayerId` | Jugador al que le toca; `null` fuera de una partida activa. |
+| `winnerId`, `finishReason` | Resultado: `four_in_line`, `draw` o `abandoned`; empate sin ganador. |
+| `createdAt`, `finishedAt` | Fechas de creación y finalización. |
+| `players` | `userId`, `username`, `piece` (`R`/`Y`), `turnOrder`, `invitationStatus`. |
+
+El modelo también admite el estado/reason `rejected` para administración, pero rechazar una invitación en el flujo normal mantiene la partida `pending` y libera al rival.
+
+MySQL conserva usuarios, partidas, participantes, invitaciones, historial y métricas HTTP. La creación y respuesta de invitaciones utilizan transacciones existentes. Actualmente `makeMove` guarda partida e historial en operaciones separadas, sin una transacción que agrupe todas esas escrituras.
+
+La respuesta de la jugada ganadora añade `message` y `winner`. Al recuperar una partida terminada, la interfaz también puede obtener el nombre del ganador a partir de `winnerId` y `players`.
+
+## Desconexión y recuperación
+
+[gameConnection.js](4Inline-frontend/src/api/gameConnection.js) y [useGameConnection.js](4Inline-frontend/src/hooks/useGameConnection.js) comparten la suscripción entre lobby y tablero:
+
+1. Deshabilitan acciones mientras se recupera la conexión/estado.
+2. Al conectar, solicitan `game:join` para recuperar el estado y volver a la sala si sigue activa o pendiente.
+3. Escuchan `game:state`, `game:ended` y `game:deleted`, filtrando por ID de partida.
+4. Limpian los listeners al salir de la pantalla e ignoran respuestas de solicitudes anteriores que ya no corresponden.
+
+Los movimientos requieren conexión y se envían como eventos `volatile`, para no dejarlos en cola durante una caída. Los comandos tienen un tiempo de espera de 10 segundos. Si una jugada falla o no recibe respuesta, el frontend consulta el estado antes de permitir otro intento: la operación pudo haberse guardado aunque se perdiera su respuesta.
+
+[activeGame.js](4Inline-frontend/src/api/activeGame.js) recuerda el ID por usuario en `sessionStorage`. Recargar la misma pestaña permite recuperar la partida, incluso su resultado si terminó durante la desconexión. No se reproducen todos los eventos perdidos; se solicita el estado guardado actual.
+
+Desconectarse o volver al menú no ejecuta abandono. Volver al menú borra el recordatorio de la pestaña, pero una partida pendiente/activa sigue existiendo y se puede recuperar por ID. Las invitaciones offline permanecen en la base de datos, aunque la interfaz no tiene una bandeja ni reproduce automáticamente notificaciones perdidas.
+
+## Pruebas y compilación
+
+Desde la raíz, ejecutar Jest una sola vez:
 
 ```bash
-npm test
+npm test -- --watchAll=false --runInBand
 ```
 
-Run with coverage:
+`npm test` por sí solo inicia el modo continuo (`--watchAll`). Para cobertura:
 
 ```bash
 npm run test:coverage
 ```
 
-The test setup replaces MySQL with an in-memory SQLite database. Service and controller tests mock dependencies where isolation is useful, repository tests exercise real Sequelize operations, and socket tests verify room events such as `game-ended`.
+La configuración de Jest incluye archivos `**/Tests/**/*.test.js`, tanto del backend como del frontend. [TestSetup.js](src/Tests/TestSetup.js) sustituye la conexión MySQL por SQLite en memoria. Las pruebas incluyen reglas, servicios, controladores, repositorios, flujo HTTP y clientes Socket.IO. Las pruebas de frontend cubren recuperación, aislamiento del recordatorio por usuario y movimientos durante desconexiones; no equivalen a pruebas visuales del navegador.
 
-The React frontend currently has no automated test command; `npm run build` is its main compile-time verification.
+Para ejecutar las pruebas enfocadas en la conexión del frontend:
 
 ```bash
-cd uno-frontend
+npm test -- --watchAll=false --runInBand --runTestsByPath 4Inline-frontend/src/Tests/gameConnection.test.js 4Inline-frontend/src/Tests/activeGame.test.js 4Inline-frontend/src/Tests/moveSocket.test.js
+```
+
+Para compilar la interfaz:
+
+```bash
+cd 4Inline-frontend
 npm run build
 ```
 
-## Design concepts
+El resultado se genera en `4Inline-frontend/dist`. Los proxies descritos aquí pertenecen al servidor de desarrollo; un despliegue del build debe configurar cómo llegar a `/api` y `/socket.io`.
 
-The code demonstrates:
+## Alcance y mejoras pendientes
 
-- SOLID through layered responsibilities, small interfaces, factories, and dependency injection.
-- A monad-like `Result` type for explicit success and failure paths.
-- Higher-order functions in validators, middleware factories, callbacks, and array operations.
-- Recursion when dealing the initial cards.
-- Generator functions for lazy card and socket iteration.
-- `map`, `find`, `filter`, `some`, `reduce`, and function composition.
+- HTTP local sin TLS configurado en Node; un despliegue público requiere definir HTTPS/WSS y sus certificados o terminación TLS.
+- Socket.IO tiene `cors.origin: '*'`; se deben definir los orígenes del despliegue.
+- La revocación de JWT vive en memoria y se pierde al reiniciar el proceso. No hay renovación automática de tokens.
+- El backend es una sola instancia. Varias instancias requerirían coordinación de eventos/salas y del estado compartido.
+- El flujo de movimientos no tiene control transaccional completo ni identificadores de petición para deduplicar reintentos.
+- El botón Start cuenta participantes aceptados; no comprueba que el rival tenga una conexión activa en ese instante.
 
-## Postman collection
-
-The original collection is available at <https://drive.google.com/file/d/1IBsu9ZvQL6RZ4Wt3hlK2ficQOGxGXZAi/view?usp=sharing>
+Más detalles de la interfaz en [4Inline-frontend/README.md](4Inline-frontend/README.md).
